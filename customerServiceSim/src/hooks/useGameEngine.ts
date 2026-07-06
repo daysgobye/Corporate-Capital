@@ -10,11 +10,13 @@ import {
   CURRENCY_LABEL,
   upgradeCost,
 } from '../game/content';
-import { playKeyClick, playSendDing, playCashRegister, playMilestoneFanfare } from '../game/audio';
+import { audio } from '../lib/audio';
+import { platform } from '../lib/platform';
+import { loadSaveData, saveGame, extractSaveData, type SaveData } from '../lib/storage';
 
 const MAX_QUEUE = 40;
 const TITLE_FLASH_MS = 2600;
-const CONFETTI_MS = 2200;
+const CONFETTI_MS = { small: 900, big: 2200 } as const;
 const AGENT_UPKEEP_INTERVAL_MS = 3000;
 
 function makeTicket(id: number): Ticket {
@@ -52,7 +54,11 @@ function initialState(): GameState {
     particles: [],
     floaters: [],
     shake: false,
-    confetti: false,
+    confettiBurst: 'none',
+    stamp: { id: 0, text: '' },
+    arrivalPulse: 0,
+    upgradeFlashId: 0,
+    upgradeFlashLabel: '',
   };
 }
 
@@ -65,7 +71,8 @@ type Action =
   | { type: 'BUY_MILESTONE'; id: string }
   | { type: 'CLEAR_PARTICLE'; id: number }
   | { type: 'CLEAR_FLOATER'; id: number }
-  | { type: 'CLEAR_CONFETTI' };
+  | { type: 'CLEAR_CONFETTI' }
+  | { type: 'HYDRATE'; data: SaveData };
 
 function upLevel(state: GameState, id: string): number {
   return state.upgradeLevels[id] ?? 0;
@@ -166,6 +173,8 @@ function reducer(state: GameState, action: Action): GameState {
       const closedTotal = state.ticketsClosed + 1;
       const levelUp = closedTotal % 8 === 0;
       const particles = spawnParticles(state);
+      const stampPool = SEND_PARTICLES[state.phase];
+      const stampText = stampPool[Math.floor(Math.random() * stampPool.length)];
       return {
         ...state,
         nextId: state.nextId + particles.length,
@@ -177,6 +186,7 @@ function reducer(state: GameState, action: Action): GameState {
         ticketsClosed: closedTotal,
         closedThisSecond: state.closedThisSecond + 1,
         particles: [...state.particles, ...particles],
+        stamp: { id: state.stamp.id + 1, text: stampText },
         ...(levelUp ? pushJobLevel(state) : {}),
       };
     }
@@ -192,6 +202,9 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         funds: state.funds - cost,
         upgradeLevels: { ...state.upgradeLevels, [def.id]: level + 1 },
+        confettiBurst: 'small',
+        upgradeFlashId: state.upgradeFlashId + 1,
+        upgradeFlashLabel: def.name,
       };
     }
 
@@ -206,7 +219,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         funds: state.funds - def.cost,
         milestonesUnlocked: { ...state.milestonesUnlocked, [def.id]: true },
-        confetti: true,
+        confettiBurst: 'big',
         titleFlashMs: TITLE_FLASH_MS,
       };
 
@@ -223,7 +236,7 @@ function reducer(state: GameState, action: Action): GameState {
           promotions,
           payoutMultiplier: 1 + promotions * 0.35,
           currencyLabel: CURRENCY_LABEL[nextPhase],
-          confetti: true,
+          confettiBurst: 'big',
           titleFlashMs: TITLE_FLASH_MS,
           jobLevel: state.jobLevel,
           titleModifiers: [],
@@ -239,8 +252,11 @@ function reducer(state: GameState, action: Action): GameState {
     case 'CLEAR_FLOATER':
       return { ...state, floaters: state.floaters.filter((f) => f.id !== action.id) };
 
+    case 'HYDRATE':
+      return { ...state, ...action.data };
+
     case 'CLEAR_CONFETTI':
-      return { ...state, confetti: false };
+      return { ...state, confettiBurst: 'none' };
 
     case 'TICK': {
       const delta = action.deltaMs;
@@ -256,8 +272,8 @@ function reducer(state: GameState, action: Action): GameState {
         const id = next.nextId;
         const ticket = makeTicket(id);
         next = next.activeTicket
-          ? { ...next, queue: [...next.queue, ticket], nextId: id + 1, ticketGenAccumMs: 0 }
-          : { ...next, activeTicket: ticket, nextId: id + 1, ticketGenAccumMs: 0 };
+          ? { ...next, queue: [...next.queue, ticket], nextId: id + 1, ticketGenAccumMs: 0, arrivalPulse: next.arrivalPulse + 1 }
+          : { ...next, activeTicket: ticket, nextId: id + 1, ticketGenAccumMs: 0, arrivalPulse: next.arrivalPulse + 1 };
       }
 
       // AI bot automation
@@ -342,43 +358,95 @@ function reducer(state: GameState, action: Action): GameState {
 export function useGameEngine() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const confettiTimer = useRef<number | null>(null);
+  const prevArrivalPulse = useRef(state.arrivalPulse);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     const interval = window.setInterval(() => dispatch({ type: 'TICK', deltaMs: 100 }), 100);
     return () => window.clearInterval(interval);
   }, []);
 
+  // Bring the platform bridge up, then restore any saved career progress.
   useEffect(() => {
-    if (state.confetti) {
+    let cancelled = false;
+    (async () => {
+      try {
+        await platform.init();
+      } catch (e) {
+        console.error('[Game] platform init failed, continuing without it', e);
+      }
+      platform.gameReady();
+      const save = await loadSaveData();
+      if (!cancelled && save) dispatch({ type: 'HYDRATE', data: save });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Autosave on an interval, and make sure the last bit of progress lands
+  // when the tab is hidden/closed rather than only on a fixed timer.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      saveGame(extractSaveData(stateRef.current));
+    }, 5000);
+
+    function saveNow() {
+      saveGame(extractSaveData(stateRef.current));
+    }
+    function handleVisibility() {
+      if (document.visibilityState === 'hidden') saveNow();
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', saveNow);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', saveNow);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state.confettiBurst !== 'none') {
       if (confettiTimer.current) window.clearTimeout(confettiTimer.current);
       confettiTimer.current = window.setTimeout(() => {
         dispatch({ type: 'CLEAR_CONFETTI' });
-      }, CONFETTI_MS);
+      }, CONFETTI_MS[state.confettiBurst]);
     }
-  }, [state.confetti]);
+  }, [state.confettiBurst]);
+
+  // A quiet notification blip whenever a fresh ticket lands in the queue.
+  useEffect(() => {
+    if (state.arrivalPulse !== prevArrivalPulse.current) {
+      prevArrivalPulse.current = state.arrivalPulse;
+      audio.tick(0.2);
+    }
+  }, [state.arrivalPulse]);
 
   const keypress = useCallback(() => {
-    playKeyClick();
+    audio.click();
     dispatch({ type: 'KEYPRESS' });
   }, []);
 
   const send = useCallback(() => {
-    playSendDing();
+    audio.correct();
     dispatch({ type: 'SEND' });
   }, []);
 
   const useCanned = useCallback((pct: number) => {
-    playCashRegister();
+    audio.select();
     dispatch({ type: 'CANNED', pct });
   }, []);
 
   const buyUpgrade = useCallback((id: string) => {
-    playCashRegister();
+    audio.clutch();
     dispatch({ type: 'BUY_UPGRADE', id });
   }, []);
 
   const buyMilestone = useCallback((id: string) => {
-    playMilestoneFanfare();
+    audio.win();
     dispatch({ type: 'BUY_MILESTONE', id });
   }, []);
 

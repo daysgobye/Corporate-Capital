@@ -1,11 +1,38 @@
 let audioCtx: AudioContext | null = null
 
+const MUTE_KEY = 'hct_muted'
+
+let muted = (() => {
+  try {
+    return localStorage.getItem(MUTE_KEY) === '1'
+  } catch {
+    return false
+  }
+})()
+
+export function isMuted(): boolean {
+  return muted
+}
+
+export function setMuted(value: boolean): void {
+  muted = value
+  try {
+    localStorage.setItem(MUTE_KEY, muted ? '1' : '0')
+  } catch { }
+}
+
+export function toggleMute(): boolean {
+  setMuted(!muted)
+  return muted
+}
+
 function getCtx(): AudioContext {
   if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
   return audioCtx
 }
 
 function playTone(freq: number, type: OscillatorType, duration: number, gain = 0.3, delay = 0) {
+  if (muted) return
   try {
     const ac = getCtx()
     const osc = ac.createOscillator()

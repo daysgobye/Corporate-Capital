@@ -1,31 +1,65 @@
 /**
- * Storage helpers — always go through the platform adapter.
+ * Save/load — always goes through the platform adapter (see lib/platform).
  *
  * On Playgama this may use cloud save (platform_internal).
  * On mobile it will call whatever the mobile SDK provides.
  * During local dev, NullPlatform falls back to localStorage.
  *
- * The game state is stored as a single JSON blob under STORAGE_KEY
- * so we make exactly one get/set call per load/save, keeping us
- * within the platform's rate limits.
+ * We only persist the "career progress" slice of GameState (funds, upgrades,
+ * milestones, the ticket queue, etc.) — not per-frame effect state like
+ * particles/floaters/confetti/the stamp animation, which should always start
+ * fresh. That slice is saved as a single JSON blob under STORAGE_KEY so we
+ * make exactly one get/set call per load/save, keeping us within the
+ * platform's rate limits.
  *
  * NOTE: IPlatform.storageGet is typed as returning `string | null`, but
  * in practice some bridges (observed with Playgama) already return a
  * parsed object rather than a raw JSON string. We defensively handle
  * both shapes here rather than trusting the type.
  */
-import type { AppState } from '../types'
-import { INITIAL_COINS } from '../data'
+import type { GameState, Phase, Ticket } from '../game/types'
 import { platform } from './platform/index'
 
-const STORAGE_KEY = 'hct_v2'
+const STORAGE_KEY = 'hct_save_v1'
 
-export function defaultAppState(): AppState {
+/** The subset of GameState worth persisting between sessions. */
+export interface SaveData {
+  nextId: number
+  phase: Phase
+  promotions: number
+  payoutMultiplier: number
+  funds: number
+  currencyLabel: string
+  queue: Ticket[]
+  activeTicket: Ticket | null
+  manualProgress: number
+  jobLevel: number
+  titleModifiers: string[]
+  upgradeLevels: Record<string, number>
+  milestonesUnlocked: Record<string, boolean>
+  aiBotNodes: number
+  agentCount: number
+  ticketsClosed: number
+}
+
+export function extractSaveData(state: GameState): SaveData {
   return {
-    coins: INITIAL_COINS,
-    owned: ['twilight', 'harrypotter'],
-    packState: {},
-    leaderboard: [],
+    nextId: state.nextId,
+    phase: state.phase,
+    promotions: state.promotions,
+    payoutMultiplier: state.payoutMultiplier,
+    funds: state.funds,
+    currencyLabel: state.currencyLabel,
+    queue: state.queue,
+    activeTicket: state.activeTicket,
+    manualProgress: state.manualProgress,
+    jobLevel: state.jobLevel,
+    titleModifiers: state.titleModifiers,
+    upgradeLevels: state.upgradeLevels,
+    milestonesUnlocked: state.milestonesUnlocked,
+    aiBotNodes: state.aiBotNodes,
+    agentCount: state.agentCount,
+    ticketsClosed: state.ticketsClosed,
   }
 }
 
@@ -38,10 +72,9 @@ export function defaultAppState(): AppState {
  *    (e.g. from manually pasting a DevTools-displayed value back into
  *    Local Storage)
  */
-function tryParseAppState(raw: unknown): unknown | null {
+function tryParseSaveData(raw: unknown): unknown | null {
   if (raw === null || raw === undefined) return null
 
-  // Already an object (bridge pre-parsed it for us) — use as-is.
   if (typeof raw === 'object') {
     console.log('[Storage] raw value was already an object, skipping JSON.parse')
     return raw
@@ -62,7 +95,7 @@ function tryParseAppState(raw: unknown): unknown | null {
     const unwrapped = raw.slice(1, -1)
     try {
       const recovered = JSON.parse(unwrapped)
-      console.warn('[Storage] recovered state after stripping an extra outer quote layer')
+      console.warn('[Storage] recovered save after stripping an extra outer quote layer')
       return recovered
     } catch (e) {
       console.error('[Storage] recovery attempt also failed', e)
@@ -72,43 +105,43 @@ function tryParseAppState(raw: unknown): unknown | null {
   return null
 }
 
-export async function loadAppState(): Promise<AppState> {
+/** Returns null if there's no save yet (or it couldn't be read) — caller keeps the fresh initial state in that case. */
+export async function loadSaveData(): Promise<SaveData | null> {
   try {
     const raw = await platform.storageGet(STORAGE_KEY)
-    console.log('[Storage] loadAppState raw =', raw, 'typeof =', typeof raw)
+    console.log('[Storage] loadSaveData raw =', raw, 'typeof =', typeof raw)
     if (!raw) {
-      console.log('[Storage] no saved state, using default')
-      return defaultAppState()
+      console.log('[Storage] no saved game, starting fresh')
+      return null
     }
 
-    const parsed = tryParseAppState(raw)
+    const parsed = tryParseSaveData(raw)
     if (parsed === null) {
-      console.error('[Storage] could not parse saved state at all, falling back to default. Raw value was:', raw)
-      return defaultAppState()
+      console.error('[Storage] could not parse saved game at all, starting fresh. Raw value was:', raw)
+      return null
     }
 
-    const merged = { ...defaultAppState(), ...(parsed as Partial<AppState>) }
-    console.log('[Storage] loaded state', merged)
+    console.log('[Storage] loaded save', parsed)
 
-    // If raw wasn't already a clean JSON string matching `parsed`
-    // (either it was a pre-parsed object, or we had to recover it from a
-    // double-quoted string), re-save in the canonical string format now.
+    // If raw wasn't already a clean JSON string matching `parsed` (either it
+    // was a pre-parsed object, or we had to recover it from a double-quoted
+    // string), re-save in the canonical string format now.
     const isCleanString = typeof raw === 'string' && raw === JSON.stringify(parsed)
     if (!isCleanString) {
       console.log('[Storage] re-saving in canonical format after non-standard load')
-      saveAppState(merged)
+      saveGame(parsed as SaveData)
     }
 
-    return merged
+    return parsed as SaveData
   } catch (e) {
-    console.error('[Storage] loadAppState failed, using default', e)
-    return defaultAppState()
+    console.error('[Storage] loadSaveData failed, starting fresh', e)
+    return null
   }
 }
 
-export function saveAppState(state: AppState): void {
-  console.log('[Storage] saveAppState', state)
-  platform.storageSet(STORAGE_KEY, JSON.stringify(state))
+export function saveGame(data: SaveData): void {
+  console.log('[Storage] saveGame', data)
+  platform.storageSet(STORAGE_KEY, JSON.stringify(data))
     .then(() => console.log('[Storage] save OK'))
     .catch(e => console.error('[Storage] save FAILED', e))
 }

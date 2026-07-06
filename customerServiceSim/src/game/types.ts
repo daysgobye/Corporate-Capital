@@ -39,6 +39,15 @@ export interface IncomeFloater {
   left: number;
 }
 
+/** 'none' = nothing playing, 'small' = upgrade sparkle, 'big' = milestone blowout */
+export type ConfettiBurst = 'none' | 'small' | 'big';
+
+/** The big rubber-stamp slam that lands on SEND. id 0 = never fired yet. */
+export interface StampMark {
+  id: number;
+  text: string;
+}
+
 export interface GameState {
   nextId: number;
   phase: Phase;
@@ -76,5 +85,13 @@ export interface GameState {
   particles: FloatingParticle[];
   floaters: IncomeFloater[];
   shake: boolean;
-  confetti: boolean;
+  confettiBurst: ConfettiBurst;
+
+  /** Big slammed word ("SYNERGY!" etc.) shown when a reply is sent. */
+  stamp: StampMark;
+  /** Increments every time a new ticket arrives — used to pop a one-shot "ping" badge. */
+  arrivalPulse: number;
+  /** Increments every time an upgrade is bought — used to pop a one-shot toast. */
+  upgradeFlashId: number;
+  upgradeFlashLabel: string;
 }

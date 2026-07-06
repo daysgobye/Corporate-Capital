@@ -1,4 +1,5 @@
 import type { GameState } from '../game/types';
+import MuteButton from './MuteButton';
 
 interface Props {
   state: GameState;
@@ -21,6 +22,7 @@ export default function JobHeader({ state, title }: Props) {
           )}
         </h1>
       </div>
+      <MuteButton />
       <div className="funds-display">
         <span className="job-title-eyebrow">{state.currencyLabel}</span>
         <div className="funds-amount">${state.funds.toLocaleString('en-US')}</div>

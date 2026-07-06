@@ -19,6 +19,11 @@ export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: P
     <section className="panel upgrades-panel" aria-label="Upgrades and milestones">
       <div className="panel-heading">
         <h2>Upgrades &amp; Milestones</h2>
+        {state.upgradeFlashId > 0 && (
+          <span key={state.upgradeFlashId} className="upgrade-flash-toast">
+            ⚡ {state.upgradeFlashLabel}!
+          </span>
+        )}
       </div>
 
       <h3 className="section-label">Active Upgrades</h3>

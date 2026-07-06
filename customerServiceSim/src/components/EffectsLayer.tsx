@@ -21,8 +21,9 @@ export default function EffectsLayer({ state, onClearParticle, onClearFloater }:
   }, [state.floaters, onClearFloater]);
 
   const confettiPieces = useMemo(() => {
-    if (!state.confetti) return [];
-    return Array.from({ length: 30 }, (_, i) => ({
+    if (state.confettiBurst === 'none') return [];
+    const count = state.confettiBurst === 'big' ? 36 : 16;
+    return Array.from({ length: count }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
       delay: Math.random() * 0.4,
@@ -30,7 +31,7 @@ export default function EffectsLayer({ state, onClearParticle, onClearFloater }:
       color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
       rotate: Math.random() * 360,
     }));
-  }, [state.confetti]);
+  }, [state.confettiBurst]);
 
   return (
     <div className="effects-layer" aria-hidden="true">
@@ -50,8 +51,8 @@ export default function EffectsLayer({ state, onClearParticle, onClearFloater }:
         </span>
       ))}
 
-      {state.confetti && (
-        <div className="confetti-field">
+      {state.confettiBurst !== 'none' && (
+        <div className={`confetti-field confetti-${state.confettiBurst}`}>
           {confettiPieces.map((c) => (
             <span
               key={c.id}
@@ -65,6 +66,12 @@ export default function EffectsLayer({ state, onClearParticle, onClearFloater }:
               }}
             />
           ))}
+        </div>
+      )}
+
+      {state.stamp.id > 0 && (
+        <div key={state.stamp.id} className="stamp-mark">
+          {state.stamp.text.replace(/[,!]+$/, '').trim() || 'SENT!'}
         </div>
       )}
     </div>
