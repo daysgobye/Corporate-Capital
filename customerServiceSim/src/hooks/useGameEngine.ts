@@ -8,7 +8,9 @@ import {
   TITLE_MODIFIERS,
   BASE_TITLE,
   CURRENCY_LABEL,
-  upgradeCost,
+  scaledUpgradeCost,
+  scaledMilestoneCost,
+  PRESTIGE_COST_SCALE,
 } from '../game/content';
 import { audio } from '../lib/audio';
 import { platform } from '../lib/platform';
@@ -79,35 +81,40 @@ function upLevel(state: GameState, id: string): number {
 }
 
 function charsPerKey(state: GameState): number {
-  const lvl = upLevel(state, 'keyboardLube');
+  const lvl = upLevel(state, 'keyboardLube') + upLevel(state, 'redTapeReflexes');
   return [2, 4, 7, 13][Math.min(lvl, 3)];
 }
 
 function ticketGenIntervalMs(state: GameState): number {
-  const mouse = upLevel(state, 'ergoMouse');
-  const marketing = state.milestonesUnlocked.aiBot ? upLevel(state, 'marketingLeadGen') : 0;
-  const ms = 4200 - mouse * 380 - marketing * 260;
+  const mouse = upLevel(state, 'ergoMouse') + upLevel(state, 'calendarSync');
+  const marketing =
+    (state.milestonesUnlocked.aiBot ? upLevel(state, 'marketingLeadGen') + upLevel(state, 'aiOutreachBlitz') : 0) +
+    (state.milestonesUnlocked.hrBots ? upLevel(state, 'townHallInvites') + upLevel(state, 'hrOutreachBlitz') : 0);
+  // Every milestone bought this loop also ramps up the incoming volume —
+  // reaching automation isn't just an upgrade tree, it's an escalation.
+  const milestonesBought = Object.values(state.milestonesUnlocked).filter(Boolean).length;
+  const ms = 4200 - mouse * 350 - marketing * 320 - milestonesBought * 200;
   return Math.max(600, ms);
 }
 
 function manualPayout(state: GameState): number {
-  const coffee = upLevel(state, 'coffeeMachine');
+  const coffee = upLevel(state, 'coffeeMachine') + upLevel(state, 'expenseAccount');
   const base = 9 + state.jobLevel * 1.6;
   return Math.round(base * (1 + coffee * 0.18) * state.payoutMultiplier);
 }
 
 function aiThresholdMs(state: GameState): number {
-  const ctx = upLevel(state, 'contextWindow');
+  const ctx = upLevel(state, 'contextWindow') + upLevel(state, 'hrBotFirmware');
   return 2600 / (1 + ctx * 0.15);
 }
 
 function aiPayout(state: GameState): number {
-  const patch = upLevel(state, 'hallucinationPatch');
+  const patch = upLevel(state, 'hallucinationPatch') + upLevel(state, 'sensitivityTraining');
   return Math.round((7 + state.jobLevel) * (1 + patch * 0.15) * state.payoutMultiplier);
 }
 
 function agentThresholdMs(state: GameState): number {
-  const training = upLevel(state, 'agentTraining');
+  const training = upLevel(state, 'agentTraining') + upLevel(state, 'managerCoaching');
   return 1500 / (1 + training * 0.2);
 }
 
@@ -127,6 +134,28 @@ function spawnParticles(state: GameState): FloatingParticle[] {
       text: pool[Math.floor(Math.random() * pool.length)],
       left: 10 + Math.random() * 80,
       colorVar: colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+  return out;
+}
+
+// A lighter burst for automated (bot/agent) resolves — automation happens far
+// more often than a manual SEND, so each one gets 1-2 particles instead of a
+// full burst. The point is that the screen should stay lively even once the
+// player isn't the one clicking SEND anymore, not go quiet.
+const MAX_PARTICLES = 60;
+
+function spawnAutoParticles(state: GameState, colorVar: string): FloatingParticle[] {
+  const pool = SEND_PARTICLES[state.phase];
+  const count = Math.random() < 0.4 ? 2 : 1;
+  const out: FloatingParticle[] = [];
+  let id = state.nextId;
+  for (let i = 0; i < count; i++) {
+    out.push({
+      id: id++,
+      text: pool[Math.floor(Math.random() * pool.length)],
+      left: 10 + Math.random() * 80,
+      colorVar,
     });
   }
   return out;
@@ -154,10 +183,11 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'CANNED': {
-      if (!state.activeTicket || !state.milestonesUnlocked.cannedResponses) return state;
+      const cannedUnlocked = state.milestonesUnlocked.cannedResponses || state.milestonesUnlocked.briefingTemplates;
+      if (!state.activeTicket || !cannedUnlocked) return state;
       if (state.cannedCooldownMs > 0) return state;
       const add = (state.activeTicket.requiredChars * action.pct) / 100;
-      const cooldownLvl = upLevel(state, 'cannedCooldown');
+      const cooldownLvl = upLevel(state, 'cannedCooldown') + upLevel(state, 'templateFirmware');
       return {
         ...state,
         manualProgress: Math.min(state.activeTicket.requiredChars, state.manualProgress + add),
@@ -196,12 +226,14 @@ function reducer(state: GameState, action: Action): GameState {
       if (!def) return state;
       const level = upLevel(state, def.id);
       if (level >= def.maxLevel) return state;
-      const cost = upgradeCost(def, level);
+      const cost = scaledUpgradeCost(def, level, state.promotions);
       if (state.funds < cost) return state;
+      const extraNode = def.id === 'additionalBotNodes' || def.id === 'additionalHrBotNodes' ? 1 : 0;
       return {
         ...state,
         funds: state.funds - cost,
         upgradeLevels: { ...state.upgradeLevels, [def.id]: level + 1 },
+        aiBotNodes: state.aiBotNodes + extraNode,
         confettiBurst: 'small',
         upgradeFlashId: state.upgradeFlashId + 1,
         upgradeFlashLabel: def.name,
@@ -213,18 +245,19 @@ function reducer(state: GameState, action: Action): GameState {
       if (!def) return state;
       if (state.milestonesUnlocked[def.id]) return state;
       if (def.requires && !state.milestonesUnlocked[def.requires]) return state;
-      if (state.funds < def.cost) return state;
+      const cost = scaledMilestoneCost(def, state.promotions);
+      if (state.funds < cost) return state;
 
       const base: GameState = {
         ...state,
-        funds: state.funds - def.cost,
+        funds: state.funds - cost,
         milestonesUnlocked: { ...state.milestonesUnlocked, [def.id]: true },
         confettiBurst: 'big',
         titleFlashMs: TITLE_FLASH_MS,
       };
 
-      if (def.id === 'aiBot') return { ...base, aiBotNodes: 3 };
-      if (def.id === 'outsourceAgents') return { ...base, agentCount: 2 };
+      if (def.id === 'aiBot' || def.id === 'hrBots') return { ...base, aiBotNodes: 3 };
+      if (def.id === 'outsourceAgents' || def.id === 'middleManagers') return { ...base, agentCount: 2 };
 
       if (def.id === 'acceptPromotion' || def.id === 'executiveReset') {
         const nextPhase = def.id === 'acceptPromotion' ? 3 : 1;
@@ -234,7 +267,7 @@ function reducer(state: GameState, action: Action): GameState {
           nextId: base.nextId + 40,
           phase: nextPhase,
           promotions,
-          payoutMultiplier: 1 + promotions * 0.35,
+          payoutMultiplier: Math.pow(PRESTIGE_COST_SCALE, promotions),
           currencyLabel: CURRENCY_LABEL[nextPhase],
           confettiBurst: 'big',
           titleFlashMs: TITLE_FLASH_MS,
@@ -284,6 +317,7 @@ function reducer(state: GameState, action: Action): GameState {
           const q = [...next.queue];
           q.shift();
           const floaterId = next.nextId;
+          const autoParticles = spawnAutoParticles(next, '--staple-blue');
           next = {
             ...next,
             queue: q,
@@ -291,8 +325,9 @@ function reducer(state: GameState, action: Action): GameState {
             funds: next.funds + aiPayout(next),
             ticketsClosed: next.ticketsClosed + 1,
             closedThisSecond: next.closedThisSecond + 1,
-            nextId: floaterId + 1,
-            floaters: [...next.floaters, { id: floaterId, amount: aiPayout(next), left: 20 + Math.random() * 60 }],
+            nextId: floaterId + autoParticles.length + 1,
+            floaters: [...next.floaters, { id: floaterId, amount: aiPayout(next), left: 20 + Math.random() * 60 }].slice(-MAX_PARTICLES),
+            particles: [...next.particles, ...autoParticles].slice(-MAX_PARTICLES),
           };
         } else {
           next = { ...next, aiBotAccumMs: accum };
@@ -307,6 +342,7 @@ function reducer(state: GameState, action: Action): GameState {
           const q = [...next.queue];
           q.shift();
           const floaterId = next.nextId;
+          const autoParticles = spawnAutoParticles(next, '--synergy-green');
           next = {
             ...next,
             queue: q,
@@ -314,8 +350,9 @@ function reducer(state: GameState, action: Action): GameState {
             funds: next.funds + agentPayout(next),
             ticketsClosed: next.ticketsClosed + 1,
             closedThisSecond: next.closedThisSecond + 1,
-            nextId: floaterId + 1,
-            floaters: [...next.floaters, { id: floaterId, amount: agentPayout(next), left: 20 + Math.random() * 60 }],
+            nextId: floaterId + autoParticles.length + 1,
+            floaters: [...next.floaters, { id: floaterId, amount: agentPayout(next), left: 20 + Math.random() * 60 }].slice(-MAX_PARTICLES),
+            particles: [...next.particles, ...autoParticles].slice(-MAX_PARTICLES),
           };
         } else {
           next = { ...next, agentAccumMs: accum };

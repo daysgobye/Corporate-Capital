@@ -37,13 +37,13 @@ export default function ManagementPanel({ state }: Props) {
         )}
         {state.aiBotNodes > 0 && (
           <div className="ops-row">
-            <span>SynergyBot</span>
+            <span>{state.phase === 3 ? 'HR Bots' : 'SynergyBot'}</span>
             <span>{state.aiBotNodes} node{state.aiBotNodes === 1 ? '' : 's'}</span>
           </div>
         )}
         {state.agentCount > 0 && (
           <div className="ops-row">
-            <span>Overseas Team</span>
+            <span>{state.phase === 3 ? 'Middle Managers' : 'Overseas Team'}</span>
             <span>{state.agentCount} agent{state.agentCount === 1 ? '' : 's'}</span>
           </div>
         )}

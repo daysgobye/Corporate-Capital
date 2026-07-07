@@ -14,7 +14,8 @@ export default function ChatPanel({ state, onKeypress, onSend, onCanned }: Props
   const ticket = state.activeTicket;
   const progressPct = ticket ? Math.min(100, (state.manualProgress / ticket.requiredChars) * 100) : 0;
   const ready = ticket ? state.manualProgress >= ticket.requiredChars : false;
-  const cannedReady = state.milestonesUnlocked.cannedResponses && state.cannedCooldownMs <= 0;
+  const cannedUnlocked = state.milestonesUnlocked.cannedResponses || state.milestonesUnlocked.briefingTemplates;
+  const cannedReady = cannedUnlocked && state.cannedCooldownMs <= 0;
 
   // Typing works anywhere on the page — no need to click into a box first.
   // It only does anything if there's a ticket open to apply it to.
@@ -84,7 +85,7 @@ export default function ChatPanel({ state, onKeypress, onSend, onCanned }: Props
 
       <VirtualKeyboard onKeypress={onKeypress} disabled={!ticket} />
 
-      {state.milestonesUnlocked.cannedResponses && (
+      {cannedUnlocked && (
         <div className="canned-row">
           {CANNED_LABELS[state.phase].map((c) => (
             <button key={c.pct} type="button" disabled={!cannedReady || !ticket} onClick={() => onCanned(c.pct)} className="canned-btn">

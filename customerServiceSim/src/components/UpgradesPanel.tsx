@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { GameState } from '../game/types';
-import { UPGRADES, MILESTONES, upgradeCost } from '../game/content';
+import { UPGRADES, MILESTONES, scaledUpgradeCost, scaledMilestoneCost } from '../game/content';
 
 interface Props {
   state: GameState;
@@ -8,6 +9,17 @@ interface Props {
 }
 
 export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: Props) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   const visibleUpgrades = UPGRADES.filter(
     (u) => u.phase === state.phase && (!u.requiresMilestone || state.milestonesUnlocked[u.requiresMilestone]),
   );
@@ -31,10 +43,24 @@ export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: P
         {visibleUpgrades.map((u) => {
           const level = state.upgradeLevels[u.id] ?? 0;
           const maxed = level >= u.maxLevel;
-          const cost = upgradeCost(u, level);
+          const cost = scaledUpgradeCost(u, level, state.promotions);
           const affordable = state.funds >= cost;
+
+          if (maxed && !expanded.has(u.id)) {
+            return (
+              <li key={u.id} className="upgrade-item upgrade-item-collapsed" onClick={() => toggleExpanded(u.id)}>
+                <strong>{u.name}</strong>
+                <span className="maxed-tag">✓ MAXED</span>
+              </li>
+            );
+          }
+
           return (
-            <li key={u.id} className="upgrade-item">
+            <li
+              key={u.id}
+              className={`upgrade-item ${maxed ? 'upgrade-item-maxed-open' : ''}`}
+              onClick={maxed ? () => toggleExpanded(u.id) : undefined}
+            >
               <div className="upgrade-info">
                 <strong>{u.name}</strong>
                 <span className="upgrade-desc">{u.description}</span>
@@ -52,7 +78,8 @@ export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: P
       <h3 className="section-label">Core Milestones</h3>
       <ul className="milestone-list">
         {visibleMilestones.map((m) => {
-          const affordable = state.funds >= m.cost;
+          const cost = scaledMilestoneCost(m, state.promotions);
+          const affordable = state.funds >= cost;
           return (
             <li key={m.id} className="milestone-item">
               <div className="upgrade-info">
@@ -61,7 +88,7 @@ export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: P
               </div>
               <button type="button" disabled={!affordable} onClick={() => onBuyMilestone(m.id)} className="milestone-btn">
                 {m.buttonLabel}
-                <span className="milestone-cost">${m.cost.toLocaleString('en-US')}</span>
+                <span className="milestone-cost">${cost.toLocaleString('en-US')}</span>
               </button>
             </li>
           );
