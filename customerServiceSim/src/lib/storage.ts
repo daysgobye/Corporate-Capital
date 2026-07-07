@@ -20,7 +20,7 @@
 import type { GameState, Phase, Ticket } from '../game/types'
 import { platform } from './platform/index'
 
-const STORAGE_KEY = 'hct_save_v1-5'
+const STORAGE_KEY = 'hct_save_v1-7'
 
 /** The subset of GameState worth persisting between sessions. */
 export interface SaveData {

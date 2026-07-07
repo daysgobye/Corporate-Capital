@@ -94,7 +94,7 @@ function ticketGenIntervalMs(state: GameState): number {
   // reaching automation isn't just an upgrade tree, it's an escalation.
   const milestonesBought = Object.values(state.milestonesUnlocked).filter(Boolean).length;
   const ms = 4200 - mouse * 350 - marketing * 320 - milestonesBought * 200;
-  return Math.max(600, ms);
+  return Math.max(1, ms);
 }
 
 function manualPayout(state: GameState): number {
@@ -301,6 +301,7 @@ function reducer(state: GameState, action: Action): GameState {
       };
 
       // Ticket generation
+      console.log(ticketGenIntervalMs(next), "tick")
       if (next.ticketGenAccumMs >= ticketGenIntervalMs(next) && next.queue.length + (next.activeTicket ? 1 : 0) < MAX_QUEUE) {
         const id = next.nextId;
         const ticket = makeTicket(id);
