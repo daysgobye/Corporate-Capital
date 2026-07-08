@@ -854,3 +854,43 @@ body {
     flex: 6;
   }
 }
+/* ---------- Money delta floater ---------- */
+.money-floater {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+  animation: money-float 1.2s ease-out forwards;
+}
+
+.money-floater-positive {
+  color: var(--synergy-green);
+}
+
+.money-floater-negative {
+  color: var(--toner-red);
+}
+
+@keyframes money-float {
+  0% { opacity: 0; transform: translateY(0) scale(0.85); }
+  15% { opacity: 1; transform: translateY(2px) scale(1.15); }
+  100% { opacity: 0; transform: translateY(40px) scale(1); }
+}
+
+/* ---------- Big-swing screen shake ---------- */
+@keyframes cash-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(-6px, 4px) rotate(-0.3deg); }
+  40% { transform: translate(6px, -4px) rotate(0.3deg); }
+  60% { transform: translate(-5px, 3px) rotate(-0.2deg); }
+  80% { transform: translate(5px, -3px) rotate(0.2deg); }
+}
+
+.cash-shake {
+  animation: cash-shake 0.45s ease-in-out;
+}

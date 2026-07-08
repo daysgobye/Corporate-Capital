@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useCallback, useRef } from 'react';
-import type { GameState, Ticket, FloatingParticle } from '../game/types';
+import type { GameState, Ticket, FloatingParticle, MoneyFloater } from '../game/types';
 import {
   UPGRADES,
   MILESTONES,
@@ -21,12 +21,21 @@ const TITLE_FLASH_MS = 2600;
 const CONFETTI_MS = { small: 900, big: 2200 } as const;
 const AGENT_UPKEEP_INTERVAL_MS = 3000;
 
+// Any single funds change that's this fraction (or more) of the funds you
+// had beforehand triggers the big screen shake — small trickles of income
+// shouldn't rattle the screen, but losing/gaining a huge chunk should.
+const MONEY_SHAKE_PCT = 0.6;
+
 function makeTicket(id: number): Ticket {
   return { id, requiredChars: 90 + Math.floor(Math.random() * 40) };
 }
 
 function initialState(): GameState {
   return {
+    autoSendPulse: 0,
+    moneyFloaters: [],
+    moneyFloaterSeq: 0,
+    moneyShakeId: 0,
     nextId: 2,
     phase: 1,
     promotions: 0,
@@ -74,7 +83,8 @@ type Action =
   | { type: 'CLEAR_PARTICLE'; id: number }
   | { type: 'CLEAR_FLOATER'; id: number }
   | { type: 'CLEAR_CONFETTI' }
-  | { type: 'HYDRATE'; data: SaveData };
+  | { type: 'HYDRATE'; data: SaveData }
+  | { type: 'CLEAR_MONEY_FLOATER'; id: number };
 
 function upLevel(state: GameState, id: string): number {
   return state.upgradeLevels[id] ?? 0;
@@ -93,7 +103,8 @@ function ticketGenIntervalMs(state: GameState): number {
   // Every milestone bought this loop also ramps up the incoming volume —
   // reaching automation isn't just an upgrade tree, it's an escalation.
   const milestonesBought = Object.values(state.milestonesUnlocked).filter(Boolean).length;
-  const ms = 4200 - mouse * 350 - marketing * 320 - milestonesBought * 200;
+  const ms = 4200 - mouse * 300 - marketing * 320 - milestonesBought * 250;
+  console.log(ms, "ms is")
   return Math.max(1, ms);
 }
 
@@ -117,10 +128,11 @@ function agentThresholdMs(state: GameState): number {
   const training = upLevel(state, 'agentTraining') + upLevel(state, 'managerCoaching');
   return 1500 / (1 + training * 0.2);
 }
-
 function agentPayout(state: GameState): number {
-  return Math.round((10 + state.jobLevel) * state.payoutMultiplier);
+  const raise = upLevel(state, 'agentPayRaise') + upLevel(state, 'managerPayRaise');
+  return Math.round((10 + state.jobLevel) * (1 + raise * 0.15) * state.payoutMultiplier);
 }
+
 
 function spawnParticles(state: GameState): FloatingParticle[] {
   const pool = SEND_PARTICLES[state.phase];
@@ -167,8 +179,32 @@ function pushJobLevel(state: GameState): Pick<GameState, 'jobLevel' | 'titleModi
   const modifiers = [...state.titleModifiers, pool[Math.floor(Math.random() * pool.length)]].slice(-6);
   return { jobLevel: newLevel, titleModifiers: modifiers, titleFlashMs: TITLE_FLASH_MS };
 }
-
-function reducer(state: GameState, action: Action): GameState {
+/** Shared "close out the active ticket" logic — used by manual SEND and by the auto-canned-response autopilot. */
+function resolveTicket(state: GameState): GameState {
+  if (!state.activeTicket) return state;
+  const nextQueue = [...state.queue];
+  const nextActive = nextQueue.length > 0 ? (nextQueue.shift() ?? null) : null;
+  const closedTotal = state.ticketsClosed + 1;
+  const levelUp = closedTotal % 8 === 0;
+  const particles = spawnParticles(state);
+  const stampPool = SEND_PARTICLES[state.phase];
+  const stampText = stampPool[Math.floor(Math.random() * stampPool.length)];
+  return {
+    ...state,
+    nextId: state.nextId + particles.length,
+    queue: nextQueue,
+    activeTicket: nextActive,
+    manualProgress: 0,
+    typedPreview: '',
+    funds: state.funds + manualPayout(state),
+    ticketsClosed: closedTotal,
+    closedThisSecond: state.closedThisSecond + 1,
+    particles: [...state.particles, ...particles],
+    stamp: { id: state.stamp.id + 1, text: stampText },
+    ...(levelUp ? pushJobLevel(state) : {}),
+  };
+}
+function applyAction(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'KEYPRESS': {
       if (!state.activeTicket) return state;
@@ -194,31 +230,10 @@ function reducer(state: GameState, action: Action): GameState {
         cannedCooldownMs: Math.max(800, 3200 - cooldownLvl * 450),
       };
     }
-
     case 'SEND': {
       if (!state.activeTicket) return state;
       if (state.manualProgress < state.activeTicket.requiredChars) return state;
-      const nextQueue = [...state.queue];
-      const nextActive = nextQueue.length > 0 ? (nextQueue.shift() ?? null) : null;
-      const closedTotal = state.ticketsClosed + 1;
-      const levelUp = closedTotal % 8 === 0;
-      const particles = spawnParticles(state);
-      const stampPool = SEND_PARTICLES[state.phase];
-      const stampText = stampPool[Math.floor(Math.random() * stampPool.length)];
-      return {
-        ...state,
-        nextId: state.nextId + particles.length,
-        queue: nextQueue,
-        activeTicket: nextActive,
-        manualProgress: 0,
-        typedPreview: '',
-        funds: state.funds + manualPayout(state),
-        ticketsClosed: closedTotal,
-        closedThisSecond: state.closedThisSecond + 1,
-        particles: [...state.particles, ...particles],
-        stamp: { id: state.stamp.id + 1, text: stampText },
-        ...(levelUp ? pushJobLevel(state) : {}),
-      };
+      return resolveTicket(state);
     }
 
     case 'BUY_UPGRADE': {
@@ -229,17 +244,18 @@ function reducer(state: GameState, action: Action): GameState {
       const cost = scaledUpgradeCost(def, level, state.promotions);
       if (state.funds < cost) return state;
       const extraNode = def.id === 'additionalBotNodes' || def.id === 'additionalHrBotNodes' ? 1 : 0;
+      const extraAgent = def.id === 'additionalAgents' || def.id === 'additionalManagers' ? 1 : 0;
       return {
         ...state,
         funds: state.funds - cost,
         upgradeLevels: { ...state.upgradeLevels, [def.id]: level + 1 },
         aiBotNodes: state.aiBotNodes + extraNode,
+        agentCount: state.agentCount + extraAgent,
         confettiBurst: 'small',
         upgradeFlashId: state.upgradeFlashId + 1,
         upgradeFlashLabel: def.name,
       };
     }
-
     case 'BUY_MILESTONE': {
       const def = MILESTONES.find((m) => m.id === action.id);
       if (!def) return state;
@@ -257,7 +273,7 @@ function reducer(state: GameState, action: Action): GameState {
       };
 
       if (def.id === 'aiBot' || def.id === 'hrBots') return { ...base, aiBotNodes: 3 };
-      if (def.id === 'outsourceAgents' || def.id === 'middleManagers') return { ...base, agentCount: 2 };
+      if (def.id === 'outsourceAgents' || def.id === 'middleManagers') return { ...base, agentCount: 1 };
 
       if (def.id === 'acceptPromotion' || def.id === 'executiveReset') {
         const nextPhase = def.id === 'acceptPromotion' ? 3 : 1;
@@ -285,12 +301,14 @@ function reducer(state: GameState, action: Action): GameState {
     case 'CLEAR_FLOATER':
       return { ...state, floaters: state.floaters.filter((f) => f.id !== action.id) };
 
+    case 'CLEAR_MONEY_FLOATER':
+      return { ...state, moneyFloaters: state.moneyFloaters.filter((f) => f.id !== action.id) };
+
     case 'HYDRATE':
       return { ...state, ...action.data };
 
     case 'CLEAR_CONFETTI':
       return { ...state, confettiBurst: 'none' };
-
     case 'TICK': {
       const delta = action.deltaMs;
       let next: GameState = {
@@ -300,64 +318,119 @@ function reducer(state: GameState, action: Action): GameState {
         ticketGenAccumMs: state.ticketGenAccumMs + delta,
       };
 
-      // Ticket generation
-      console.log(ticketGenIntervalMs(next), "tick")
-      if (next.ticketGenAccumMs >= ticketGenIntervalMs(next) && next.queue.length + (next.activeTicket ? 1 : 0) < MAX_QUEUE) {
-        const id = next.nextId;
-        const ticket = makeTicket(id);
-        next = next.activeTicket
-          ? { ...next, queue: [...next.queue, ticket], nextId: id + 1, ticketGenAccumMs: 0, arrivalPulse: next.arrivalPulse + 1 }
-          : { ...next, activeTicket: ticket, nextId: id + 1, ticketGenAccumMs: 0, arrivalPulse: next.arrivalPulse + 1 };
+      // Ticket generation — loops so more than one ticket can arrive in a
+      // single tick once the interval (via upgrades) drops below the tick
+      // length, instead of capping arrivals at exactly one per 100ms.
+      {
+        const interval = ticketGenIntervalMs(next);
+        let queue = [...next.queue];
+        let activeTicket = next.activeTicket;
+        let nextId = next.nextId;
+        let accum = next.ticketGenAccumMs;
+        let arrivals = 0;
+
+        while (accum >= interval && queue.length + (activeTicket ? 1 : 0) < MAX_QUEUE) {
+          const ticket = makeTicket(nextId);
+          nextId += 1;
+          if (activeTicket) queue.push(ticket);
+          else activeTicket = ticket;
+          accum -= interval;
+          arrivals += 1;
+        }
+
+        next = arrivals > 0
+          ? { ...next, queue, activeTicket, nextId, ticketGenAccumMs: accum, arrivalPulse: next.arrivalPulse + arrivals }
+          : { ...next, ticketGenAccumMs: accum };
       }
 
-      // AI bot automation
+      // Auto-canned-response upgrade — the instant the cooldown clears (and
+      // there's a ticket in progress), automatically fire a full canned
+      // response AND send it, exactly as if the player clicked RESOLVE then SEND.
+      {
+        const autoCannedLvl = upLevel(next, 'autoCannedResponses') + upLevel(next, 'autoTemplates');
+        const cannedUnlocked = next.milestonesUnlocked.cannedResponses || next.milestonesUnlocked.briefingTemplates;
+        if (autoCannedLvl > 0 && cannedUnlocked && next.cannedCooldownMs <= 0 && next.activeTicket) {
+          const cooldownLvl = upLevel(next, 'cannedCooldown') + upLevel(next, 'templateFirmware');
+          next = resolveTicket(next);
+          next = {
+            ...next,
+            cannedCooldownMs: Math.max(800, 3200 - cooldownLvl * 450),
+            autoSendPulse: next.autoSendPulse + 1,
+          };
+        }
+      }
+      // AI bot automation — loops so multiple nodes can each close a ticket
+      // within the same tick, rather than capping at one resolve per tick
+      // regardless of node count.
       if (next.aiBotNodes > 0 && next.queue.length > 0) {
-        const accum = next.aiBotAccumMs + delta * next.aiBotNodes;
         const threshold = aiThresholdMs(next);
-        if (accum >= threshold) {
-          const q = [...next.queue];
-          q.shift();
-          const floaterId = next.nextId;
+        const payout = aiPayout(next);
+        let accum = next.aiBotAccumMs + delta * next.aiBotNodes;
+        let queue = [...next.queue];
+        let nextId = next.nextId;
+        let floaters = [...next.floaters];
+        let particles = [...next.particles];
+        let resolved = 0;
+
+        while (accum >= threshold && queue.length > 0) {
+          queue.shift();
+          accum -= threshold;
+          resolved += 1;
+          const floaterId = nextId;
           const autoParticles = spawnAutoParticles(next, '--staple-blue');
-          next = {
-            ...next,
-            queue: q,
-            aiBotAccumMs: accum - threshold,
-            funds: next.funds + aiPayout(next),
-            ticketsClosed: next.ticketsClosed + 1,
-            closedThisSecond: next.closedThisSecond + 1,
-            nextId: floaterId + autoParticles.length + 1,
-            floaters: [...next.floaters, { id: floaterId, amount: aiPayout(next), left: 20 + Math.random() * 60 }].slice(-MAX_PARTICLES),
-            particles: [...next.particles, ...autoParticles].slice(-MAX_PARTICLES),
-          };
-        } else {
-          next = { ...next, aiBotAccumMs: accum };
+          floaters.push({ id: floaterId, amount: payout, left: 20 + Math.random() * 60 });
+          particles.push(...autoParticles);
+          nextId = floaterId + autoParticles.length + 1;
         }
+
+        next = {
+          ...next,
+          queue,
+          aiBotAccumMs: accum,
+          funds: next.funds + payout * resolved,
+          ticketsClosed: next.ticketsClosed + resolved,
+          closedThisSecond: next.closedThisSecond + resolved,
+          nextId,
+          floaters: floaters.slice(-MAX_PARTICLES),
+          particles: particles.slice(-MAX_PARTICLES),
+        };
       }
 
-      // Human agents
+      // Human agents — same fix: multiple agents can each close a ticket in
+      // the same tick instead of one resolve per tick no matter how many
+      // agents are working.
       if (next.agentCount > 0 && next.queue.length > 0) {
-        const accum = next.agentAccumMs + delta * next.agentCount;
         const threshold = agentThresholdMs(next);
-        if (accum >= threshold) {
-          const q = [...next.queue];
-          q.shift();
-          const floaterId = next.nextId;
+        const payout = agentPayout(next);
+        let accum = next.agentAccumMs + delta * next.agentCount;
+        let queue = [...next.queue];
+        let nextId = next.nextId;
+        let floaters = [...next.floaters];
+        let particles = [...next.particles];
+        let resolved = 0;
+
+        while (accum >= threshold && queue.length > 0) {
+          queue.shift();
+          accum -= threshold;
+          resolved += 1;
+          const floaterId = nextId;
           const autoParticles = spawnAutoParticles(next, '--synergy-green');
-          next = {
-            ...next,
-            queue: q,
-            agentAccumMs: accum - threshold,
-            funds: next.funds + agentPayout(next),
-            ticketsClosed: next.ticketsClosed + 1,
-            closedThisSecond: next.closedThisSecond + 1,
-            nextId: floaterId + autoParticles.length + 1,
-            floaters: [...next.floaters, { id: floaterId, amount: agentPayout(next), left: 20 + Math.random() * 60 }].slice(-MAX_PARTICLES),
-            particles: [...next.particles, ...autoParticles].slice(-MAX_PARTICLES),
-          };
-        } else {
-          next = { ...next, agentAccumMs: accum };
+          floaters.push({ id: floaterId, amount: payout, left: 20 + Math.random() * 60 });
+          particles.push(...autoParticles);
+          nextId = floaterId + autoParticles.length + 1;
         }
+
+        next = {
+          ...next,
+          queue,
+          agentAccumMs: accum,
+          funds: next.funds + payout * resolved,
+          ticketsClosed: next.ticketsClosed + resolved,
+          closedThisSecond: next.closedThisSecond + resolved,
+          nextId,
+          floaters: floaters.slice(-MAX_PARTICLES),
+          particles: particles.slice(-MAX_PARTICLES),
+        };
 
         const upkeepAccum = next.agentUpkeepAccumMs + delta;
         if (upkeepAccum >= AGENT_UPKEEP_INTERVAL_MS) {
@@ -391,6 +464,34 @@ function reducer(state: GameState, action: Action): GameState {
     default:
       return state;
   }
+}
+
+/**
+ * Wraps applyAction so any net funds change (from any action) produces a
+ * floating +$X / -$X delta near the Corporate Capital figure, and triggers
+ * the big screen-shake (via moneyShakeId) when the change is >=60% of the
+ * funds you had going in. HYDRATE is excluded so restoring a save doesn't
+ * read as one giant "gain".
+ */
+function reducer(state: GameState, action: Action): GameState {
+  const prevFunds = state.funds;
+  const next = applyAction(state, action);
+
+  if (action.type === 'HYDRATE' || action.type === 'CLEAR_MONEY_FLOATER') return next;
+
+  const delta = next.funds - prevFunds;
+  if (delta === 0) return next;
+
+  const pctSwing = prevFunds > 0 ? Math.abs(delta) / prevFunds : 0;
+  const floaterId = next.moneyFloaterSeq + 1;
+  const floater: MoneyFloater = { id: floaterId, amount: delta };
+
+  return {
+    ...next,
+    moneyFloaterSeq: floaterId,
+    moneyFloaters: [...next.moneyFloaters, floater].slice(-8),
+    moneyShakeId: pctSwing >= MONEY_SHAKE_PCT ? next.moneyShakeId + 1 : next.moneyShakeId,
+  };
 }
 
 export function useGameEngine() {
@@ -456,13 +557,20 @@ export function useGameEngine() {
   }, [state.confettiBurst]);
 
   // A quiet notification blip whenever a fresh ticket lands in the queue.
+
   useEffect(() => {
     if (state.arrivalPulse !== prevArrivalPulse.current) {
       prevArrivalPulse.current = state.arrivalPulse;
       audio.tick(0.2);
     }
   }, [state.arrivalPulse]);
-
+  const prevAutoSendPulse = useRef(state.autoSendPulse);
+  useEffect(() => {
+    if (state.autoSendPulse !== prevAutoSendPulse.current) {
+      prevAutoSendPulse.current = state.autoSendPulse;
+      audio.correct();
+    }
+  }, [state.autoSendPulse]);
   const keypress = useCallback(() => {
     audio.click();
     dispatch({ type: 'KEYPRESS' });
@@ -490,6 +598,7 @@ export function useGameEngine() {
 
   const clearParticle = useCallback((id: number) => dispatch({ type: 'CLEAR_PARTICLE', id }), []);
   const clearFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_FLOATER', id }), []);
+  const clearMoneyFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_MONEY_FLOATER', id }), []);
 
   const currentTitle = `${state.titleModifiers.join(' ')} ${BASE_TITLE[state.phase]}`.trim();
 
@@ -503,5 +612,6 @@ export function useGameEngine() {
     buyMilestone,
     clearParticle,
     clearFloater,
+    clearMoneyFloater,
   };
 }

@@ -4,7 +4,10 @@ export interface Ticket {
   id: number;
   requiredChars: number;
 }
-
+export interface MoneyFloater {
+  id: number;
+  amount: number; // positive = gain, negative = loss
+}
 export interface UpgradeDef {
   id: string;
   name: string;
@@ -49,6 +52,13 @@ export interface StampMark {
 }
 
 export interface GameState {
+  /** Increments each time the auto-canned-response upgrade fires a full auto-send — used to play a sound cue. */
+  autoSendPulse: number;
+  moneyFloaters: MoneyFloater[];
+  moneyFloaterSeq: number;
+  /** Increments any time a funds change is >=60% of prior funds — used to retrigger the shake CSS animation. */
+  moneyShakeId: number
+
   nextId: number;
   phase: Phase;
   promotions: number;
