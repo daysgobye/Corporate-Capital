@@ -148,6 +148,16 @@ export const UPGRADES: UpgradeDef[] = [
     requiresMilestone: 'outsourceAgents',
   },
   {
+    id: 'marketingLeadGen',
+    name: 'Marketing Lead Generation',
+    description: 'Increases the incoming ticket rate.',
+    baseCost: 4000,
+    costGrowth: 1.9,
+    maxLevel: 6,
+    phase: 1,
+    requiresMilestone: 'outsourceAgents',
+  },
+  {
     id: 'agentTraining',
     name: 'Overseas Agent Training',
     description: 'Agents resolve tickets faster.',
@@ -177,16 +187,7 @@ export const UPGRADES: UpgradeDef[] = [
     phase: 1,
     requiresMilestone: 'aiBot',
   },
-  {
-    id: 'marketingLeadGen',
-    name: 'Marketing Lead Generation',
-    description: 'Increases the incoming ticket rate.',
-    baseCost: 4000,
-    costGrowth: 1.9,
-    maxLevel: 6,
-    phase: 1,
-    requiresMilestone: 'aiBot',
-  },
+
   {
     id: 'aiOutreachBlitz',
     name: 'AI-Powered Outreach Blitz',
@@ -203,7 +204,7 @@ export const UPGRADES: UpgradeDef[] = [
     description: 'Adds another SynergyBot node working the queue.',
     baseCost: 10000,
     costGrowth: 2.0,
-    maxLevel: 5,
+    maxLevel: 20,
     phase: 1,
     requiresMilestone: 'aiBot',
   },
