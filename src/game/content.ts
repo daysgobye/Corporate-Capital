@@ -86,7 +86,7 @@ export const UPGRADES: UpgradeDef[] = [
     description: 'Each keypress types more of the reply.',
     baseCost: 25,
     costGrowth: 1.6,
-    maxLevel: 4,
+    maxLevel: 6,
     phase: 1,
   },
   {
@@ -213,8 +213,8 @@ export const UPGRADES: UpgradeDef[] = [
     name: 'Red Tape Reflexes',
     description: 'Each keypress logs more of the memo.',
     baseCost: 25,
-    costGrowth: 1.6,
-    maxLevel: 3,
+    costGrowth: 1.65,
+    maxLevel: 6,
     phase: 3,
   },
   {
@@ -222,7 +222,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: 'Calendar Sync',
     description: 'Reduces the wait between incoming grievances.',
     baseCost: 25,
-    costGrowth: 1.45,
+    costGrowth: 1.5,
     maxLevel: 10,
     phase: 3,
   },
@@ -230,16 +230,16 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'expenseAccount',
     name: 'Discretionary Expense Account',
     description: 'Boosts payout per manual grievance.',
-    baseCost: 60,
-    costGrowth: 1.8,
-    maxLevel: 5,
+    baseCost: 90,
+    costGrowth: 1.85,
+    maxLevel: Infinity,
     phase: 3,
   },
   {
     id: 'autoTemplates',
     name: 'Grievance Template Autopilot',
     description: 'Automatically fires a full canned response the instant the cooldown clears.',
-    baseCost: 3000,
+    baseCost: 4000,
     costGrowth: 1.5,
     maxLevel: 1,
     phase: 3,
@@ -249,8 +249,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'templateFirmware',
     name: 'Template Library Firmware',
     description: 'Shortens the cooldown on canned responses.',
-    baseCost: 200,
-    costGrowth: 1.9,
+    baseCost: 250,
+    costGrowth: 2.0,
     maxLevel: 5,
     phase: 3,
     requiresMilestone: 'briefingTemplates',
@@ -259,8 +259,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'managerPayRaise',
     name: 'Manager Stipend Increase',
     description: 'Increases payout per resolved grievance for Middle Managers.',
-    baseCost: 1800,
-    costGrowth: 1.8,
+    baseCost: 2400,
+    costGrowth: 1.9,
     maxLevel: 6,
     phase: 3,
     requiresMilestone: 'middleManagers',
@@ -269,8 +269,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'additionalManagers',
     name: 'Hire Another Middle Manager',
     description: 'Adds another Middle Manager working the queue.',
-    baseCost: 6000,
-    costGrowth: 2.0,
+    baseCost: 8000,
+    costGrowth: 2.1,
     maxLevel: 3,
     phase: 3,
     requiresMilestone: 'middleManagers',
@@ -279,8 +279,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'managerCoaching',
     name: 'Middle Manager Coaching',
     description: 'Managers resolve grievances faster.',
-    baseCost: 1500,
-    costGrowth: 1.8,
+    baseCost: 2000,
+    costGrowth: 1.9,
     maxLevel: 6,
     phase: 3,
     requiresMilestone: 'middleManagers',
@@ -289,8 +289,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'hrBotFirmware',
     name: 'HR Bot Firmware Update',
     description: 'HR Bots resolve grievances faster.',
-    baseCost: 2500,
-    costGrowth: 1.7,
+    baseCost: 3500,
+    costGrowth: 1.8,
     maxLevel: 6,
     phase: 3,
     requiresMilestone: 'hrBots',
@@ -299,8 +299,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'sensitivityTraining',
     name: 'Mandatory Sensitivity Training',
     description: 'Fewer escalations — more payout per resolved grievance.',
-    baseCost: 3200,
-    costGrowth: 1.8,
+    baseCost: 4500,
+    costGrowth: 1.9,
     maxLevel: 6,
     phase: 3,
     requiresMilestone: 'hrBots',
@@ -309,8 +309,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'townHallInvites',
     name: 'Town Hall Invitations',
     description: 'Increases the incoming grievance rate.',
-    baseCost: 4000,
-    costGrowth: 1.9,
+    baseCost: 5500,
+    costGrowth: 2.0,
     maxLevel: 6,
     phase: 3,
     requiresMilestone: 'hrBots',
@@ -319,8 +319,8 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'hrOutreachBlitz',
     name: 'Grievance Outreach Blitz',
     description: 'HR starts proactively soliciting complaints. Massively increases the incoming grievance rate.',
-    baseCost: 6000,
-    costGrowth: 2.1,
+    baseCost: 8500,
+    costGrowth: 2.2,
     maxLevel: 4,
     phase: 3,
     requiresMilestone: 'hrBots',
@@ -329,9 +329,9 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'additionalHrBotNodes',
     name: 'Deploy Additional HR Bot',
     description: 'Adds another HR Bot node working the queue.',
-    baseCost: 10000,
-    costGrowth: 2.0,
-    maxLevel: 5,
+    baseCost: 14000,
+    costGrowth: 2.1,
+    maxLevel: 20,
     phase: 3,
     requiresMilestone: 'hrBots',
   },
@@ -377,7 +377,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'briefingTemplates',
     name: 'Standardized Grievance Templates',
     description: 'Unlocks one-click macro buttons to close out complaints.',
-    cost: 1000,
+    cost: 1200,
     phase: 3,
     buttonLabel: 'UNLOCK TEMPLATES',
   },
@@ -385,7 +385,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'middleManagers',
     name: 'Hire Middle Managers',
     description: 'Managers absorb complaints so you do not have to.',
-    cost: 4000,
+    cost: 5000,
     phase: 3,
     requires: 'briefingTemplates',
     buttonLabel: 'HIRE MANAGERS',
@@ -394,7 +394,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'hrBots',
     name: 'Automated HR Bots',
     description: 'Replaces your middle managers with bots that auto-deny leave requests and log grievances.',
-    cost: 80000,
+    cost: 150000,
     phase: 3,
     requires: 'middleManagers',
     buttonLabel: 'DEPLOY HR BOTS',
@@ -403,12 +403,56 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'executiveReset',
     name: 'Fire The Middle Managers',
     description: 'Consolidate power. Restart as a more efficient tyrant.',
-    cost: 1000000,
+    cost: 2000000,
     phase: 3,
     requires: 'hrBots',
     buttonLabel: 'RESTRUCTURE THE COMPANY',
   },
 ];
+
+/**
+ * === Ticket spawn-rate tuning ===
+ * Controls how fast tickets arrive (ticketGenIntervalMs in useGameEngine.ts).
+ * Each upgrade/milestone that speeds up arrivals gets its own knob here
+ * instead of being lumped into a shared "mouse"/"marketing" bucket — bump a
+ * number up to make that specific upgrade/milestone speed up arrivals more,
+ * drop it toward 0 to make it barely matter, or remove an entry entirely to
+ * make that upgrade/milestone not affect spawn rate at all.
+ *
+ * All values are milliseconds shaved OFF the base interval (bigger number =
+ * faster tickets). The formula floors at 1ms no matter how much is shaved off.
+ */
+export const TICKET_SPAWN_BASE_INTERVAL_MS = 4200;
+
+export interface SpawnRateUpgradeModifier {
+  /** Must match an UpgradeDef id above. */
+  upgradeId: string;
+  /** ms shaved off the arrival interval per level of this upgrade. */
+  msPerLevel: number;
+  /** Optional — this modifier only applies once the given milestone is unlocked. */
+  requiresMilestone?: string;
+}
+
+export const TICKET_SPAWN_UPGRADE_MODIFIERS: SpawnRateUpgradeModifier[] = [
+  { upgradeId: 'ergoMouse', msPerLevel: 300 },
+  { upgradeId: 'calendarSync', msPerLevel: 300 },
+  { upgradeId: 'marketingLeadGen', msPerLevel: 320, requiresMilestone: 'aiBot' },
+  { upgradeId: 'aiOutreachBlitz', msPerLevel: 320, requiresMilestone: 'aiBot' },
+  { upgradeId: 'townHallInvites', msPerLevel: 320, requiresMilestone: 'hrBots' },
+  { upgradeId: 'hrOutreachBlitz', msPerLevel: 320, requiresMilestone: 'hrBots' },
+];
+
+/** ms shaved off the arrival interval for each milestone unlocked, keyed by milestone id. */
+export const TICKET_SPAWN_MILESTONE_MS: Record<string, number> = {
+  cannedResponses: 250,
+  outsourceAgents: 300,
+  aiBot: 100,
+  acceptPromotion: 250,
+  briefingTemplates: 250,
+  middleManagers: 250,
+  hrBots: 250,
+  executiveReset: 250,
+};
 
 export function upgradeCost(def: UpgradeDef, level: number): number {
   return Math.round(def.baseCost * Math.pow(def.costGrowth, level));

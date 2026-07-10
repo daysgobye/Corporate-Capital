@@ -11,6 +11,9 @@ import {
   scaledUpgradeCost,
   scaledMilestoneCost,
   PRESTIGE_COST_SCALE,
+  TICKET_SPAWN_BASE_INTERVAL_MS,
+  TICKET_SPAWN_UPGRADE_MODIFIERS,
+  TICKET_SPAWN_MILESTONE_MS,
 } from '../game/content';
 import { audio } from '../lib/audio';
 import { platform } from '../lib/platform';
@@ -96,16 +99,20 @@ function charsPerKey(state: GameState): number {
 }
 
 function ticketGenIntervalMs(state: GameState): number {
-  const mouse = upLevel(state, 'ergoMouse') + upLevel(state, 'calendarSync');
-  const marketing =
-    (state.milestonesUnlocked.aiBot ? upLevel(state, 'marketingLeadGen') + upLevel(state, 'aiOutreachBlitz') : 0) +
-    (state.milestonesUnlocked.hrBots ? upLevel(state, 'townHallInvites') + upLevel(state, 'hrOutreachBlitz') : 0);
-  // Every milestone bought this loop also ramps up the incoming volume —
-  // reaching automation isn't just an upgrade tree, it's an escalation.
-  const milestonesBought = Object.values(state.milestonesUnlocked).filter(Boolean).length;
-  const ms = 4200 - mouse * 300 - marketing * 320 - milestonesBought * 250;
-  console.log(ms, "ms is")
-  return Math.max(1, ms);
+  let reduction = 0;
+
+  for (const mod of TICKET_SPAWN_UPGRADE_MODIFIERS) {
+    if (mod.requiresMilestone && !state.milestonesUnlocked[mod.requiresMilestone]) continue;
+    reduction += upLevel(state, mod.upgradeId) * mod.msPerLevel;
+  }
+
+  for (const milestoneId in TICKET_SPAWN_MILESTONE_MS) {
+    if (state.milestonesUnlocked[milestoneId]) {
+      reduction += TICKET_SPAWN_MILESTONE_MS[milestoneId];
+    }
+  }
+
+  return Math.max(1, TICKET_SPAWN_BASE_INTERVAL_MS - reduction);
 }
 
 function manualPayout(state: GameState): number {
@@ -336,6 +343,19 @@ function applyAction(state: GameState, action: Action): GameState {
           else activeTicket = ticket;
           accum -= interval;
           arrivals += 1;
+        }
+
+        // If the queue is (still) full, don't let unspent arrival time pile up into
+        // a backlog. Without this, every tick the queue sits capped keeps adding to
+        // `accum` even though nothing can spawn — so the moment automation frees up
+        // a single slot, the entire backlog dumps back in and the queue snaps right
+        // back to full. That makes the queue feel impossible to get under control
+        // no matter how many upgrades you buy, since clearing a ticket instantly
+        // gets replaced from the stockpile instead of at the normal pace.
+        // Clamping to one interval's worth of credit means a freed slot refills
+        // once, at the normal rate, instead of flooding from stored-up debt.
+        if (queue.length + (activeTicket ? 1 : 0) >= MAX_QUEUE) {
+          accum = Math.min(accum, interval);
         }
 
         next = arrivals > 0
