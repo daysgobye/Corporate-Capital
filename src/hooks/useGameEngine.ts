@@ -14,6 +14,8 @@ import {
   TICKET_SPAWN_BASE_INTERVAL_MS,
   TICKET_SPAWN_UPGRADE_MODIFIERS,
   TICKET_SPAWN_MILESTONE_MS,
+  computeAdReward,
+  randomAdDelayMs,
 } from '../game/content';
 import { audio } from '../lib/audio';
 import { platform } from '../lib/platform';
@@ -73,6 +75,10 @@ function initialState(): GameState {
     arrivalPulse: 0,
     upgradeFlashId: 0,
     upgradeFlashLabel: '',
+    maxFundsEver: 0,
+    adTimerMs: randomAdDelayMs(),
+    adPopup: null,
+    adsUnlocked: false,
   };
 }
 
@@ -87,7 +93,8 @@ type Action =
   | { type: 'CLEAR_FLOATER'; id: number }
   | { type: 'CLEAR_CONFETTI' }
   | { type: 'HYDRATE'; data: SaveData }
-  | { type: 'CLEAR_MONEY_FLOATER'; id: number };
+  | { type: 'CLEAR_MONEY_FLOATER'; id: number }
+  | { type: 'CLAIM_AD_REWARD' };
 
 function upLevel(state: GameState, id: string): number {
   return state.upgradeLevels[id] ?? 0;
@@ -111,8 +118,9 @@ function ticketGenIntervalMs(state: GameState): number {
       reduction += TICKET_SPAWN_MILESTONE_MS[milestoneId];
     }
   }
-
-  return Math.max(1, TICKET_SPAWN_BASE_INTERVAL_MS - reduction);
+  const ms = TICKET_SPAWN_BASE_INTERVAL_MS - reduction
+  console.log(ms, "ms is")
+  return ms
 }
 
 function manualPayout(state: GameState): number {
@@ -296,6 +304,11 @@ function applyAction(state: GameState, action: Action): GameState {
           titleFlashMs: TITLE_FLASH_MS,
           jobLevel: state.jobLevel,
           titleModifiers: [],
+          // Carry these forward across a prestige reset — the ad reward stays
+          // meaningful and doesn't get an easy popup right as you reset.
+          maxFundsEver: state.maxFundsEver,
+          adTimerMs: state.adTimerMs,
+          adsUnlocked: state.adsUnlocked,
         };
       }
 
@@ -316,6 +329,16 @@ function applyAction(state: GameState, action: Action): GameState {
 
     case 'CLEAR_CONFETTI':
       return { ...state, confettiBurst: 'none' };
+
+    case 'CLAIM_AD_REWARD': {
+      if (!state.adPopup) return state;
+      return {
+        ...state,
+        funds: state.funds + state.adPopup.rewardAmount,
+        adPopup: null,
+      };
+    }
+
     case 'TICK': {
       const delta = action.deltaMs;
       let next: GameState = {
@@ -478,6 +501,26 @@ function applyAction(state: GameState, action: Action): GameState {
         next = { ...next, secondAccumMs: secondAccum };
       }
 
+      // Rewarded-ad ("Insider Trading Opportunity") popup — fires on a random
+      // 1-5 minute cadence. It never auto-dismisses; if this timer fires again
+      // while a popup is still up, the new one (fresh id + freshly-rolled
+      // reward) just overwrites it.
+      {
+        const adTimerMs = next.adTimerMs - delta;
+        if (adTimerMs <= 0) {
+          next = {
+            ...next,
+            adPopup: {
+              id: next.adPopup ? next.adPopup.id + 1 : 1,
+              rewardAmount: computeAdReward(next.maxFundsEver),
+            },
+            adTimerMs: randomAdDelayMs(),
+          };
+        } else {
+          next = { ...next, adTimerMs };
+        }
+      }
+
       return next;
     }
 
@@ -491,11 +534,17 @@ function applyAction(state: GameState, action: Action): GameState {
  * floating +$X / -$X delta near the Corporate Capital figure, and triggers
  * the big screen-shake (via moneyShakeId) when the change is >=60% of the
  * funds you had going in. HYDRATE is excluded so restoring a save doesn't
- * read as one giant "gain".
+ * read as one giant "gain". This is also where `maxFundsEver` gets updated,
+ * since it needs to track the peak across every possible source of funds —
+ * manual sends, automation, ad rewards, everything.
  */
 function reducer(state: GameState, action: Action): GameState {
   const prevFunds = state.funds;
-  const next = applyAction(state, action);
+  let next = applyAction(state, action);
+
+  if (next.funds > next.maxFundsEver) {
+    next = { ...next, maxFundsEver: next.funds };
+  }
 
   if (action.type === 'HYDRATE' || action.type === 'CLEAR_MONEY_FLOATER') return next;
 
@@ -620,6 +669,30 @@ export function useGameEngine() {
   const clearFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_FLOATER', id }), []);
   const clearMoneyFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_MONEY_FLOATER', id }), []);
 
+  // "Insider Trading Opportunity" popup — if adsUnlocked is on, skip straight
+  // to the reward; otherwise play the platform's rewarded ad and only pay
+  // out if the player actually watched it through.
+  const watchAd = useCallback(async () => {
+    const popup = stateRef.current.adPopup;
+    if (!popup) return;
+
+    if (stateRef.current.adsUnlocked) {
+      audio.win();
+      dispatch({ type: 'CLAIM_AD_REWARD' });
+      return;
+    }
+
+    try {
+      const rewarded = await platform.showRewarded('insider_trading_tip');
+      if (rewarded) {
+        audio.win();
+        dispatch({ type: 'CLAIM_AD_REWARD' });
+      }
+    } catch (e) {
+      console.error('[Game] showRewarded failed', e);
+    }
+  }, []);
+
   const currentTitle = `${state.titleModifiers.join(' ')} ${BASE_TITLE[state.phase]}`.trim();
 
   return {
@@ -633,5 +706,6 @@ export function useGameEngine() {
     clearParticle,
     clearFloater,
     clearMoneyFloater,
+    watchAd,
   };
 }

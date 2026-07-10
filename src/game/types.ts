@@ -51,6 +51,17 @@ export interface StampMark {
   text: string;
 }
 
+/**
+ * The "Insider Trading Opportunity" rewarded-ad popup. It does not auto-dismiss —
+ * it only goes away when the player watches the ad (or, once `adsUnlocked` is on,
+ * taps to instantly collect). If the timer fires again while one is still showing,
+ * the new popup (fresh id + freshly-rolled reward) simply overwrites it.
+ */
+export interface AdPopupState {
+  id: number;
+  rewardAmount: number;
+}
+
 export interface GameState {
   /** Increments each time the auto-canned-response upgrade fires a full auto-send — used to play a sound cue. */
   autoSendPulse: number;
@@ -104,4 +115,17 @@ export interface GameState {
   /** Increments every time an upgrade is bought — used to pop a one-shot toast. */
   upgradeFlashId: number;
   upgradeFlashLabel: string;
+
+  /** Highest `funds` value ever reached this prestige run — the basis for the rewarded-ad payout. */
+  maxFundsEver: number;
+  /** Countdown to the next "Insider Trading Opportunity" popup. */
+  adTimerMs: number;
+  /** The currently-showing rewarded-ad popup, if any. Null = nothing showing. */
+  adPopup: AdPopupState | null;
+  /**
+   * Dev/config toggle: when true, the popup still appears on its normal
+   * schedule but tapping it instantly grants the reward instead of playing
+   * a rewarded ad first.
+   */
+  adsUnlocked: boolean;
 }

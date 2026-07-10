@@ -12,6 +12,12 @@
  * make exactly one get/set call per load/save, keeping us within the
  * platform's rate limits.
  *
+ * The rewarded-ad popup itself (`adPopup`) and its countdown (`adTimerMs`)
+ * are NOT persisted — like particles/floaters, they should always start
+ * fresh on load rather than potentially resurrecting a stale popup. But
+ * `maxFundsEver` (the basis for the ad reward) and `adsUnlocked` (the
+ * dev/config toggle) ARE persisted, since they're real progress state.
+ *
  * NOTE: IPlatform.storageGet is typed as returning `string | null`, but
  * in practice some bridges (observed with Playgama) already return a
  * parsed object rather than a raw JSON string. We defensively handle
@@ -40,6 +46,8 @@ export interface SaveData {
   aiBotNodes: number
   agentCount: number
   ticketsClosed: number
+  maxFundsEver: number
+  adsUnlocked: boolean
 }
 
 export function extractSaveData(state: GameState): SaveData {
@@ -60,6 +68,8 @@ export function extractSaveData(state: GameState): SaveData {
     aiBotNodes: state.aiBotNodes,
     agentCount: state.agentCount,
     ticketsClosed: state.ticketsClosed,
+    maxFundsEver: state.maxFundsEver,
+    adsUnlocked: state.adsUnlocked,
   }
 }
 

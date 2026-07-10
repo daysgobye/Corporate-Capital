@@ -6,13 +6,14 @@ import ManagementPanel from './components/ManagementPanel';
 import UpgradesPanel from './components/UpgradesPanel';
 import EffectsLayer from './components/EffectsLayer';
 import MobileTabBar from './components/MobileTabBar';
+import AdPopup from './components/AdPopup';
 import type { MobileTab } from './components/MobileTabBar';
 import './game/game.css';
 
 function App() {
   const {
     state, currentTitle, keypress, send, useCanned, buyUpgrade, buyMilestone,
-    clearParticle, clearFloater, clearMoneyFloater,
+    clearParticle, clearFloater, clearMoneyFloater, watchAd,
   } = useGameEngine();
   const [mobileTab, setMobileTab] = useState<MobileTab>('queue');
 
@@ -40,6 +41,10 @@ function App() {
       <MobileTabBar active={mobileTab} onChange={setMobileTab} />
 
       <EffectsLayer state={state} onClearParticle={clearParticle} onClearFloater={clearFloater} />
+
+      {/* Rendered at the app-shell's top level (outside panels-grid) so it always
+          shows on top regardless of which mobile tab is currently active. */}
+      <AdPopup state={state} onWatch={watchAd} />
     </div>
   );
 }

@@ -203,7 +203,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: 'Deploy Additional Node',
     description: 'Adds another SynergyBot node working the queue.',
     baseCost: 10000,
-    costGrowth: 2.0,
+    costGrowth: 1.6,
     maxLevel: 20,
     phase: 1,
     requiresMilestone: 'aiBot',
@@ -212,7 +212,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'redTapeReflexes',
     name: 'Red Tape Reflexes',
     description: 'Each keypress logs more of the memo.',
-    baseCost: 25,
+    baseCost: 150,
     costGrowth: 1.65,
     maxLevel: 6,
     phase: 3,
@@ -221,7 +221,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'calendarSync',
     name: 'Calendar Sync',
     description: 'Reduces the wait between incoming grievances.',
-    baseCost: 25,
+    baseCost: 150,
     costGrowth: 1.5,
     maxLevel: 10,
     phase: 3,
@@ -230,7 +230,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'expenseAccount',
     name: 'Discretionary Expense Account',
     description: 'Boosts payout per manual grievance.',
-    baseCost: 90,
+    baseCost: 540,
     costGrowth: 1.85,
     maxLevel: Infinity,
     phase: 3,
@@ -239,7 +239,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'autoTemplates',
     name: 'Grievance Template Autopilot',
     description: 'Automatically fires a full canned response the instant the cooldown clears.',
-    baseCost: 4000,
+    baseCost: 24000,
     costGrowth: 1.5,
     maxLevel: 1,
     phase: 3,
@@ -249,7 +249,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'templateFirmware',
     name: 'Template Library Firmware',
     description: 'Shortens the cooldown on canned responses.',
-    baseCost: 250,
+    baseCost: 1500,
     costGrowth: 2.0,
     maxLevel: 5,
     phase: 3,
@@ -259,7 +259,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'managerPayRaise',
     name: 'Manager Stipend Increase',
     description: 'Increases payout per resolved grievance for Middle Managers.',
-    baseCost: 2400,
+    baseCost: 14400,
     costGrowth: 1.9,
     maxLevel: 6,
     phase: 3,
@@ -269,7 +269,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'additionalManagers',
     name: 'Hire Another Middle Manager',
     description: 'Adds another Middle Manager working the queue.',
-    baseCost: 8000,
+    baseCost: 48000,
     costGrowth: 2.1,
     maxLevel: 3,
     phase: 3,
@@ -279,7 +279,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'managerCoaching',
     name: 'Middle Manager Coaching',
     description: 'Managers resolve grievances faster.',
-    baseCost: 2000,
+    baseCost: 12000,
     costGrowth: 1.9,
     maxLevel: 6,
     phase: 3,
@@ -289,7 +289,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'hrBotFirmware',
     name: 'HR Bot Firmware Update',
     description: 'HR Bots resolve grievances faster.',
-    baseCost: 3500,
+    baseCost: 21000,
     costGrowth: 1.8,
     maxLevel: 6,
     phase: 3,
@@ -299,7 +299,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'sensitivityTraining',
     name: 'Mandatory Sensitivity Training',
     description: 'Fewer escalations — more payout per resolved grievance.',
-    baseCost: 4500,
+    baseCost: 27000,
     costGrowth: 1.9,
     maxLevel: 6,
     phase: 3,
@@ -309,7 +309,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'townHallInvites',
     name: 'Town Hall Invitations',
     description: 'Increases the incoming grievance rate.',
-    baseCost: 5500,
+    baseCost: 33000,
     costGrowth: 2.0,
     maxLevel: 6,
     phase: 3,
@@ -319,7 +319,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'hrOutreachBlitz',
     name: 'Grievance Outreach Blitz',
     description: 'HR starts proactively soliciting complaints. Massively increases the incoming grievance rate.',
-    baseCost: 8500,
+    baseCost: 51000,
     costGrowth: 2.2,
     maxLevel: 4,
     phase: 3,
@@ -329,12 +329,12 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'additionalHrBotNodes',
     name: 'Deploy Additional HR Bot',
     description: 'Adds another HR Bot node working the queue.',
-    baseCost: 14000,
+    baseCost: 84000,
     costGrowth: 2.1,
     maxLevel: 20,
     phase: 3,
     requiresMilestone: 'hrBots',
-  },
+  }
 ];
 
 export const MILESTONES: MilestoneDef[] = [
@@ -368,7 +368,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'acceptPromotion',
     name: 'Accept Promotion',
     description: 'Give up your support upgrades. Become Junior HR Associate.',
-    cost: 1000000,
+    cost: 2500000,
     phase: 1,
     requires: 'aiBot',
     buttonLabel: 'ACCEPT PROMOTION',
@@ -436,8 +436,8 @@ export interface SpawnRateUpgradeModifier {
 export const TICKET_SPAWN_UPGRADE_MODIFIERS: SpawnRateUpgradeModifier[] = [
   { upgradeId: 'ergoMouse', msPerLevel: 300 },
   { upgradeId: 'calendarSync', msPerLevel: 300 },
-  { upgradeId: 'marketingLeadGen', msPerLevel: 320, requiresMilestone: 'aiBot' },
-  { upgradeId: 'aiOutreachBlitz', msPerLevel: 320, requiresMilestone: 'aiBot' },
+  { upgradeId: 'marketingLeadGen', msPerLevel: 80 },
+  { upgradeId: 'aiOutreachBlitz', msPerLevel: 20, requiresMilestone: 'aiBot' },
   { upgradeId: 'townHallInvites', msPerLevel: 320, requiresMilestone: 'hrBots' },
   { upgradeId: 'hrOutreachBlitz', msPerLevel: 320, requiresMilestone: 'hrBots' },
 ];
@@ -445,8 +445,8 @@ export const TICKET_SPAWN_UPGRADE_MODIFIERS: SpawnRateUpgradeModifier[] = [
 /** ms shaved off the arrival interval for each milestone unlocked, keyed by milestone id. */
 export const TICKET_SPAWN_MILESTONE_MS: Record<string, number> = {
   cannedResponses: 250,
-  outsourceAgents: 300,
-  aiBot: 100,
+  outsourceAgents: 278,
+  aiBot: 50,
   acceptPromotion: 250,
   briefingTemplates: 250,
   middleManagers: 250,
@@ -477,4 +477,26 @@ export function scaledUpgradeCost(def: UpgradeDef, level: number, promotions: nu
 
 export function scaledMilestoneCost(def: MilestoneDef, promotions: number): number {
   return Math.round(def.cost * costMultiplier(promotions));
+}
+
+/**
+ * === Rewarded-ad ("Insider Trading Opportunity") tuning ===
+ */
+
+/** Popup re-checks/refreshes on a random cadence somewhere in this range. */
+export const AD_POPUP_MIN_DELAY_MS = 60_000; // 1 minute
+export const AD_POPUP_MAX_DELAY_MS = 5 * 60_000; // 5 minutes
+
+/** Floor so the very first popup (before you've made any real money) still feels worth tapping. */
+export const AD_REWARD_FLOOR = 50;
+
+/** The payout always "feels like good value": it's your best-ever funds total, wobbled +/-20%. */
+export function computeAdReward(maxFundsEver: number): number {
+  const base = Math.max(maxFundsEver, AD_REWARD_FLOOR);
+  const variance = 0.8 + Math.random() * 0.4; // 0.8x - 1.2x
+  return Math.max(1, Math.round(base * variance));
+}
+
+export function randomAdDelayMs(): number {
+  return AD_POPUP_MIN_DELAY_MS + Math.random() * (AD_POPUP_MAX_DELAY_MS - AD_POPUP_MIN_DELAY_MS);
 }
