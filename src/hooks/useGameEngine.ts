@@ -16,6 +16,7 @@ import {
   TICKET_SPAWN_MILESTONE_MS,
   computeAdReward,
   randomAdDelayMs,
+  pickAdFlavor,
 } from '../game/content';
 import { audio } from '../lib/audio';
 import { platform } from '../lib/platform';
@@ -118,9 +119,8 @@ function ticketGenIntervalMs(state: GameState): number {
       reduction += TICKET_SPAWN_MILESTONE_MS[milestoneId];
     }
   }
-  const ms = TICKET_SPAWN_BASE_INTERVAL_MS - reduction
-  console.log(ms, "ms is")
-  return ms
+
+  return Math.max(1, TICKET_SPAWN_BASE_INTERVAL_MS - reduction);
 }
 
 function manualPayout(state: GameState): number {
@@ -298,7 +298,7 @@ function applyAction(state: GameState, action: Action): GameState {
           nextId: base.nextId + 40,
           phase: nextPhase,
           promotions,
-          payoutMultiplier: Math.pow(PRESTIGE_COST_SCALE, promotions),
+          payoutMultiplier: promotions,
           currencyLabel: CURRENCY_LABEL[nextPhase],
           confettiBurst: 'big',
           titleFlashMs: TITLE_FLASH_MS,
@@ -504,7 +504,7 @@ function applyAction(state: GameState, action: Action): GameState {
       // Rewarded-ad ("Insider Trading Opportunity") popup — fires on a random
       // 1-5 minute cadence. It never auto-dismisses; if this timer fires again
       // while a popup is still up, the new one (fresh id + freshly-rolled
-      // reward) just overwrites it.
+      // reward + freshly-rolled joke) just overwrites it.
       {
         const adTimerMs = next.adTimerMs - delta;
         if (adTimerMs <= 0) {
@@ -513,6 +513,7 @@ function applyAction(state: GameState, action: Action): GameState {
             adPopup: {
               id: next.adPopup ? next.adPopup.id + 1 : 1,
               rewardAmount: computeAdReward(next.maxFundsEver),
+              ...pickAdFlavor(next.adsUnlocked),
             },
             adTimerMs: randomAdDelayMs(),
           };

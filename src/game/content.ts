@@ -172,8 +172,8 @@ export const UPGRADES: UpgradeDef[] = [
     name: 'Context Window Expansion',
     description: 'SynergyBot resolves tickets faster.',
     baseCost: 2500,
-    costGrowth: 1.7,
-    maxLevel: 6,
+    costGrowth: 1.5,
+    maxLevel: 12,
     phase: 1,
     requiresMilestone: 'aiBot',
   },
@@ -202,9 +202,9 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'additionalBotNodes',
     name: 'Deploy Additional Node',
     description: 'Adds another SynergyBot node working the queue.',
-    baseCost: 10000,
-    costGrowth: 1.6,
-    maxLevel: 20,
+    baseCost: 3000,
+    costGrowth: 1.7,
+    maxLevel: 11,
     phase: 1,
     requiresMilestone: 'aiBot',
   },
@@ -239,7 +239,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'autoTemplates',
     name: 'Grievance Template Autopilot',
     description: 'Automatically fires a full canned response the instant the cooldown clears.',
-    baseCost: 24000,
+    baseCost: 1800,
     costGrowth: 1.5,
     maxLevel: 1,
     phase: 3,
@@ -359,7 +359,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'aiBot',
     name: 'SynergyBot v1.0',
     description: 'Replaces your overseas agents with an AI chatbot that claims and closes tickets on its own.',
-    cost: 100000,
+    cost: 250000,
     phase: 1,
     requires: 'outsourceAgents',
     buttonLabel: 'DEPLOY SYNERGYBOT',
@@ -377,7 +377,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'briefingTemplates',
     name: 'Standardized Grievance Templates',
     description: 'Unlocks one-click macro buttons to close out complaints.',
-    cost: 1200,
+    cost: 2500,
     phase: 3,
     buttonLabel: 'UNLOCK TEMPLATES',
   },
@@ -385,7 +385,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'middleManagers',
     name: 'Hire Middle Managers',
     description: 'Managers absorb complaints so you do not have to.',
-    cost: 5000,
+    cost: 10000,
     phase: 3,
     requires: 'briefingTemplates',
     buttonLabel: 'HIRE MANAGERS',
@@ -394,7 +394,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'hrBots',
     name: 'Automated HR Bots',
     description: 'Replaces your middle managers with bots that auto-deny leave requests and log grievances.',
-    cost: 150000,
+    cost: 280000,
     phase: 3,
     requires: 'middleManagers',
     buttonLabel: 'DEPLOY HR BOTS',
@@ -403,7 +403,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'executiveReset',
     name: 'Fire The Middle Managers',
     description: 'Consolidate power. Restart as a more efficient tyrant.',
-    cost: 2000000,
+    cost: 20000000,
     phase: 3,
     requires: 'hrBots',
     buttonLabel: 'RESTRUCTURE THE COMPANY',
@@ -432,12 +432,11 @@ export interface SpawnRateUpgradeModifier {
   /** Optional — this modifier only applies once the given milestone is unlocked. */
   requiresMilestone?: string;
 }
-
 export const TICKET_SPAWN_UPGRADE_MODIFIERS: SpawnRateUpgradeModifier[] = [
   { upgradeId: 'ergoMouse', msPerLevel: 300 },
   { upgradeId: 'calendarSync', msPerLevel: 300 },
   { upgradeId: 'marketingLeadGen', msPerLevel: 80 },
-  { upgradeId: 'aiOutreachBlitz', msPerLevel: 20, requiresMilestone: 'aiBot' },
+  { upgradeId: 'aiOutreachBlitz', msPerLevel: 18, requiresMilestone: 'aiBot' },
   { upgradeId: 'townHallInvites', msPerLevel: 320, requiresMilestone: 'hrBots' },
   { upgradeId: 'hrOutreachBlitz', msPerLevel: 320, requiresMilestone: 'hrBots' },
 ];
@@ -446,7 +445,7 @@ export const TICKET_SPAWN_UPGRADE_MODIFIERS: SpawnRateUpgradeModifier[] = [
 export const TICKET_SPAWN_MILESTONE_MS: Record<string, number> = {
   cannedResponses: 250,
   outsourceAgents: 278,
-  aiBot: 50,
+  aiBot: 70,
   acceptPromotion: 250,
   briefingTemplates: 250,
   middleManagers: 250,
@@ -500,3 +499,59 @@ export function computeAdReward(maxFundsEver: number): number {
 export function randomAdDelayMs(): number {
   return AD_POPUP_MIN_DELAY_MS + Math.random() * (AD_POPUP_MAX_DELAY_MS - AD_POPUP_MIN_DELAY_MS);
 }
+
+/** Rotating "eyebrow" tag on the sticky note — picked fresh each time it appears. */
+export const AD_TIP_EYEBROWS: string[] = [
+  'Insider Tip',
+  'Confidential Tip',
+  'Hot Tip',
+  'Anonymous Tip',
+  'Off The Record',
+  'Whisper Network',
+  'Water Cooler Intel',
+  'Totally Legal Tip',
+  'Definitely Not A Scam',
+];
+
+/** One-liners for the normal (watch-an-ad) state. */
+export const AD_TIP_LINES: string[] = [
+  'A guy in a trench coat has a tip.',
+  'Your cousin who "works in crypto" called again.',
+  'An anonymous fax just came through. It smells like cigars.',
+  'A pigeon dropped a note on your desk. It has numbers on it.',
+  'Someone in the elevator whispered a stock symbol at you.',
+  'Your horoscope mentioned a "sudden windfall." Coincidence?',
+  'A guy named Gary swears this one is "basically legal."',
+  'The vending machine gave you a receipt AND a stock tip.',
+  'A fortune cookie said "buy low, tell no one."',
+  'Your uncle just got back from "consulting" in the Caymans.',
+  'Someone left a briefcase full of tips. Also, maybe take the briefcase.',
+  'A parrot at the bar keeps squawking a ticker symbol.',
+  'The office psychic had a vision involving your bank account.',
+  'A guy on the bus offered you a "can\'t-miss opportunity."',
+  'Someone slid an envelope under the break room door.',
+  'A fax machine you forgot you owned just woke up.',
+  'A stranger in sunglasses mouthed "buy" through the window.',
+  'Your smart fridge suggests you diversify your assets.',
+];
+
+/** One-liners for once `adsUnlocked` is on — the ad step is skipped entirely. */
+export const AD_TIP_LINES_UNLOCKED: string[] = [
+  'Your broker already cleared this one. No video required.',
+  'Turns out insider trading is easier when you own the company.',
+  'The SEC is on your payroll now, apparently.',
+  'You skipped the ad AND the ethics. Efficient.',
+  "This one's pre-approved by your legal team (you have no legal team).",
+  'The tip fairy waived the ad fee this time.',
+  'No commercials for you — you ARE the commercial now.',
+  'Your lawyer says this is fine. You do not have a lawyer.',
+];
+
+/** Picks a fresh eyebrow + one-liner combo for a newly-spawned popup. */
+export function pickAdFlavor(adsUnlocked: boolean): { eyebrow: string; copy: string } {
+  const eyebrow = AD_TIP_EYEBROWS[Math.floor(Math.random() * AD_TIP_EYEBROWS.length)];
+  const pool = adsUnlocked ? AD_TIP_LINES_UNLOCKED : AD_TIP_LINES;
+  const copy = pool[Math.floor(Math.random() * pool.length)];
+  return { eyebrow, copy };
+}
+

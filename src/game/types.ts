@@ -55,11 +55,16 @@ export interface StampMark {
  * The "Insider Trading Opportunity" rewarded-ad popup. It does not auto-dismiss —
  * it only goes away when the player watches the ad (or, once `adsUnlocked` is on,
  * taps to instantly collect). If the timer fires again while one is still showing,
- * the new popup (fresh id + freshly-rolled reward) simply overwrites it.
+ * the new popup (fresh id + freshly-rolled reward + freshly-rolled flavor text)
+ * simply overwrites it.
  */
 export interface AdPopupState {
   id: number;
   rewardAmount: number;
+  /** Rotating "eyebrow" tag, e.g. "Insider Tip" / "Hot Tip" / "Off The Record". */
+  eyebrow: string;
+  /** The joke one-liner body copy for this particular popup. */
+  copy: string;
 }
 
 export interface GameState {
