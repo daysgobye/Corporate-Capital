@@ -256,6 +256,16 @@ export const UPGRADES: UpgradeDef[] = [
     requiresMilestone: 'briefingTemplates',
   },
   {
+    id: 'templateDistribution',
+    name: 'Grievance Template Distribution',
+    description: 'Circulates templates more widely, encouraging more grievances to get filed. Increases the incoming grievance rate.',
+    baseCost: 2200,
+    costGrowth: 1.6,
+    maxLevel: 2,
+    phase: 3,
+    requiresMilestone: 'briefingTemplates',
+  },
+  {
     id: 'managerPayRaise',
     name: 'Manager Stipend Increase',
     description: 'Increases payout per resolved grievance for Middle Managers.',
@@ -286,6 +296,16 @@ export const UPGRADES: UpgradeDef[] = [
     requiresMilestone: 'middleManagers',
   },
   {
+    id: 'townHallInvites',
+    name: 'Town Hall Invitations',
+    description: 'Increases the incoming grievance rate.',
+    baseCost: 33000,
+    costGrowth: 2.0,
+    maxLevel: 6,
+    phase: 3,
+    requiresMilestone: 'middleManagers',
+  },
+  {
     id: 'hrBotFirmware',
     name: 'HR Bot Firmware Update',
     description: 'HR Bots resolve grievances faster.',
@@ -305,16 +325,7 @@ export const UPGRADES: UpgradeDef[] = [
     phase: 3,
     requiresMilestone: 'hrBots',
   },
-  {
-    id: 'townHallInvites',
-    name: 'Town Hall Invitations',
-    description: 'Increases the incoming grievance rate.',
-    baseCost: 33000,
-    costGrowth: 2.0,
-    maxLevel: 6,
-    phase: 3,
-    requiresMilestone: 'hrBots',
-  },
+
   {
     id: 'hrOutreachBlitz',
     name: 'Grievance Outreach Blitz',
@@ -385,7 +396,7 @@ export const MILESTONES: MilestoneDef[] = [
     id: 'middleManagers',
     name: 'Hire Middle Managers',
     description: 'Managers absorb complaints so you do not have to.',
-    cost: 10000,
+    cost: 30000,
     phase: 3,
     requires: 'briefingTemplates',
     buttonLabel: 'HIRE MANAGERS',
@@ -435,10 +446,11 @@ export interface SpawnRateUpgradeModifier {
 export const TICKET_SPAWN_UPGRADE_MODIFIERS: SpawnRateUpgradeModifier[] = [
   { upgradeId: 'ergoMouse', msPerLevel: 300 },
   { upgradeId: 'calendarSync', msPerLevel: 300 },
+  { upgradeId: 'templateDistribution', msPerLevel: 100 },
   { upgradeId: 'marketingLeadGen', msPerLevel: 80 },
+  { upgradeId: 'townHallInvites', msPerLevel: 80 },
   { upgradeId: 'aiOutreachBlitz', msPerLevel: 18, requiresMilestone: 'aiBot' },
-  { upgradeId: 'townHallInvites', msPerLevel: 320, requiresMilestone: 'hrBots' },
-  { upgradeId: 'hrOutreachBlitz', msPerLevel: 320, requiresMilestone: 'hrBots' },
+  { upgradeId: 'hrOutreachBlitz', msPerLevel: 18, requiresMilestone: 'hrBots' },
 ];
 
 /** ms shaved off the arrival interval for each milestone unlocked, keyed by milestone id. */
@@ -448,7 +460,7 @@ export const TICKET_SPAWN_MILESTONE_MS: Record<string, number> = {
   aiBot: 70,
   acceptPromotion: 250,
   briefingTemplates: 250,
-  middleManagers: 250,
+  middleManagers: 750,
   hrBots: 250,
   executiveReset: 250,
 };
