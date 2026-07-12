@@ -48,6 +48,21 @@ export default function ManagementPanel({ state }: Props) {
           </div>
         )}
       </div>
+
+      <div className="afk-status">
+        <h3>AFK Play</h3>
+        {!state.afkUnlocked && (
+          <p className="ops-empty">
+            Locked. Unlock your first autopilot upgrade to let the office keep working while you&apos;re away.
+          </p>
+        )}
+        {state.afkUnlocked && (
+          <div className="afk-status-row">
+            <span>Time Banked</span>
+            <span className="afk-status-value">{state.afkMinutesCap} min</span>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

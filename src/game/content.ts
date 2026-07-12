@@ -567,3 +567,40 @@ export function pickAdFlavor(adsUnlocked: boolean): { eyebrow: string; copy: str
   return { eyebrow, copy };
 }
 
+export const AFK_UNLOCK_UPGRADE_IDS: string[] = ['autoCannedResponses', 'autoTemplates'];
+export const AFK_BASE_MINUTES_ON_UNLOCK = 10;
+export const AFK_MINUTES_PER_MILESTONE = 15;
+export const AFK_MAX_CAP_MINUTES = 240;
+export const AFK_MIN_TRIGGER_MS = 60_000;
+
+export const AFK_HEADLINES: Record<Phase, string[]> = {
+  1: [
+    "THE INBOX DIDN'T WAIT FOR YOU",
+    'SYNERGY CONTINUED WITHOUT YOU',
+    'THE QUEUE MOVED ON',
+    'PRODUCTIVITY, UNSUPERVISED',
+  ],
+  2: [
+    'THE BOTS COVERED YOUR SHIFT',
+    'AUTOMATION NEVER CLOCKS OUT',
+  ],
+  3: [
+    'HR HANDLED IT WITHOUT YOU',
+    'THE GRIEVANCES KEPT COMING',
+    'MORALE, UNSUPERVISED',
+  ],
+};
+
+export function buildAfkSummary(
+  phase: Phase,
+  minutes: number,
+  ticketsClosed: number,
+  fundsGained: number,
+): { headline: string; subline: string } {
+  const pool = AFK_HEADLINES[phase] ?? AFK_HEADLINES[1];
+  const headline = pool[Math.floor(Math.random() * pool.length)];
+  const mins = Math.max(1, Math.round(minutes));
+  const ticketsLabel = ticketsClosed === 1 ? 'ticket' : 'tickets';
+  const subline = `While you were gone for ${mins} minute${mins === 1 ? '' : 's'}, the team closed ${ticketsClosed.toLocaleString('en-US')} ${ticketsLabel} and brought in $${fundsGained.toLocaleString('en-US')}.`;
+  return { headline, subline };
+}

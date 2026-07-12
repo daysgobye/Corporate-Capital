@@ -26,7 +26,7 @@
 import type { GameState, Phase, Ticket } from '../game/types'
 import { platform } from './platform/index'
 
-const STORAGE_KEY = 'hct_save_v1-11'
+const STORAGE_KEY = 'hct_save_v1-12'
 
 /** The subset of GameState worth persisting between sessions. */
 export interface SaveData {
@@ -48,6 +48,12 @@ export interface SaveData {
   ticketsClosed: number
   maxFundsEver: number
   adsUnlocked: boolean
+maxFundsEver: number
+  adsUnlocked: boolean
+  afkUnlocked: boolean
+  afkMinutesCap: number
+  /** Epoch ms at the moment this save was written — the anchor for AFK catch-up on next boot. */
+  lastSavedAt: number
 }
 
 export function extractSaveData(state: GameState): SaveData {
@@ -70,6 +76,11 @@ export function extractSaveData(state: GameState): SaveData {
     ticketsClosed: state.ticketsClosed,
     maxFundsEver: state.maxFundsEver,
     adsUnlocked: state.adsUnlocked,
+ maxFundsEver: state.maxFundsEver,
+    adsUnlocked: state.adsUnlocked,
+    afkUnlocked: state.afkUnlocked,
+    afkMinutesCap: state.afkMinutesCap,
+    lastSavedAt: Date.now(),
   }
 }
 

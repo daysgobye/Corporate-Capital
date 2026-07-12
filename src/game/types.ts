@@ -1,5 +1,12 @@
 export type Phase = 1 | 2 | 3;
-
+export interface AfkSummaryState {
+  id: number;
+  minutes: number;
+  ticketsClosed: number;
+  fundsGained: number;
+  headline: string;
+  subline: string;
+}
 export interface Ticket {
   id: number;
   requiredChars: number;
@@ -68,6 +75,14 @@ export interface AdPopupState {
 }
 
 export interface GameState {
+/** Total AFK-play minutes unlocked so far via automation + milestones. */
+  afkMinutesCap: number;
+  /** True once the first automation upgrade in a phase has been bought. */
+  afkUnlocked: boolean;
+  /** Real-world epoch ms of the last save — used to compute AFK catch-up on boot. */
+  lastSavedAt: number;
+  /** Set right after a boot-time AFK catch-up runs, to trigger the summary popup. */
+  afkSummary: AfkSummaryState | null;
   /** Increments each time the auto-canned-response upgrade fires a full auto-send — used to play a sound cue. */
   autoSendPulse: number;
   moneyFloaters: MoneyFloater[];

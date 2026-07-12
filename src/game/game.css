@@ -1092,3 +1092,156 @@ body {
 .cash-shake {
   animation: cash-shake 0.45s ease-in-out;
 }
+/* ---------- AFK summary ("welcome back") popup ---------- */
+.afk-summary-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(33, 26, 18, 0.55);
+  animation: afk-overlay-in 0.25s ease-out;
+}
+
+.afk-summary-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 3px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  padding: 26px 22px 22px;
+  text-align: center;
+  animation: afk-card-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.afk-summary-eyebrow {
+  display: block;
+  font-family: var(--display);
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.afk-summary-headline {
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.25;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+
+.afk-summary-subline {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+}
+
+.afk-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.afk-summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 6px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--border);
+}
+
+.afk-summary-stat-value {
+  font-family: var(--display);
+  font-size: 15px;
+  color: var(--synergy-green);
+}
+
+.afk-summary-stat-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-soft);
+}
+
+.afk-summary-btn {
+  width: 100%;
+  padding: 13px;
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--panel);
+  background: var(--toner-red);
+  border: 3px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.afk-summary-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--border);
+}
+
+.afk-summary-btn:active {
+  transform: translate(2px, 2px) scale(0.97);
+  box-shadow: 1px 1px 0 var(--border);
+}
+
+@keyframes afk-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes afk-card-in {
+  0% { opacity: 0; transform: scale(0.85) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .afk-summary-overlay,
+  .afk-summary-card {
+    animation: none !important;
+  }
+}
+/* ---------- AFK status (Management Pane) ---------- */
+.afk-status {
+  margin-top: 18px;
+}
+
+.afk-status h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.afk-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--border);
+}
+
+.afk-status-value {
+  font-family: var(--display);
+  font-size: 14px;
+  color: var(--accent);
+}

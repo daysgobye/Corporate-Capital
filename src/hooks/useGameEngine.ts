@@ -17,6 +17,12 @@ import {
   computeAdReward,
   randomAdDelayMs,
   pickAdFlavor,
+  AFK_UNLOCK_UPGRADE_IDS,
+  AFK_BASE_MINUTES_ON_UNLOCK,
+  AFK_MINUTES_PER_MILESTONE,
+  AFK_MAX_CAP_MINUTES,
+  AFK_MIN_TRIGGER_MS,
+  buildAfkSummary,
 } from '../game/content';
 import { audio } from '../lib/audio';
 import { platform } from '../lib/platform';
@@ -80,6 +86,10 @@ function initialState(): GameState {
     adTimerMs: randomAdDelayMs(),
     adPopup: null,
     adsUnlocked: false,
+    afkMinutesCap: 0,
+    afkUnlocked: false,
+    lastSavedAt: Date.now(),
+    afkSummary: null,
   };
 }
 
@@ -93,9 +103,10 @@ type Action =
   | { type: 'CLEAR_PARTICLE'; id: number }
   | { type: 'CLEAR_FLOATER'; id: number }
   | { type: 'CLEAR_CONFETTI' }
-  | { type: 'HYDRATE'; data: SaveData }
+  | { type: 'HYDRATE'; data: Partial<GameState> }
   | { type: 'CLEAR_MONEY_FLOATER'; id: number }
-  | { type: 'CLAIM_AD_REWARD' };
+  | { type: 'CLAIM_AD_REWARD' }
+  | { type: 'CLEAR_AFK_SUMMARY' };
 
 function upLevel(state: GameState, id: string): number {
   return state.upgradeLevels[id] ?? 0;
@@ -260,6 +271,7 @@ function applyAction(state: GameState, action: Action): GameState {
       if (state.funds < cost) return state;
       const extraNode = def.id === 'additionalBotNodes' || def.id === 'additionalHrBotNodes' ? 1 : 0;
       const extraAgent = def.id === 'additionalAgents' || def.id === 'additionalManagers' ? 1 : 0;
+      const unlocksAfk = AFK_UNLOCK_UPGRADE_IDS.includes(def.id) && !state.afkUnlocked;
       return {
         ...state,
         funds: state.funds - cost,
@@ -269,6 +281,10 @@ function applyAction(state: GameState, action: Action): GameState {
         confettiBurst: 'small',
         upgradeFlashId: state.upgradeFlashId + 1,
         upgradeFlashLabel: def.name,
+        afkUnlocked: state.afkUnlocked || unlocksAfk,
+        afkMinutesCap: unlocksAfk
+          ? Math.min(AFK_MAX_CAP_MINUTES, state.afkMinutesCap + AFK_BASE_MINUTES_ON_UNLOCK)
+          : state.afkMinutesCap,
       };
     }
     case 'BUY_MILESTONE': {
@@ -279,12 +295,14 @@ function applyAction(state: GameState, action: Action): GameState {
       const cost = scaledMilestoneCost(def, state.promotions);
       if (state.funds < cost) return state;
 
+      const afkGain = state.afkUnlocked ? AFK_MINUTES_PER_MILESTONE : 0;
       const base: GameState = {
         ...state,
         funds: state.funds - cost,
         milestonesUnlocked: { ...state.milestonesUnlocked, [def.id]: true },
         confettiBurst: 'big',
         titleFlashMs: TITLE_FLASH_MS,
+        afkMinutesCap: Math.min(AFK_MAX_CAP_MINUTES, state.afkMinutesCap + afkGain),
       };
 
       if (def.id === 'aiBot' || def.id === 'hrBots') return { ...base, aiBotNodes: 3 };
@@ -305,10 +323,13 @@ function applyAction(state: GameState, action: Action): GameState {
           jobLevel: state.jobLevel,
           titleModifiers: [],
           // Carry these forward across a prestige reset — the ad reward stays
-          // meaningful and doesn't get an easy popup right as you reset.
+          // meaningful and doesn't get an easy popup right as you reset, and
+          // the AFK allowance is real career progress too.
           maxFundsEver: state.maxFundsEver,
           adTimerMs: state.adTimerMs,
           adsUnlocked: state.adsUnlocked,
+          afkMinutesCap: base.afkMinutesCap,
+          afkUnlocked: state.afkUnlocked,
         };
       }
 
@@ -338,6 +359,9 @@ function applyAction(state: GameState, action: Action): GameState {
         adPopup: null,
       };
     }
+
+    case 'CLEAR_AFK_SUMMARY':
+      return { ...state, afkSummary: null };
 
     case 'TICK': {
       const delta = action.deltaMs;
@@ -531,6 +555,25 @@ function applyAction(state: GameState, action: Action): GameState {
 }
 
 /**
+ * Fast-forwards a GameState by `totalMs` of game time using the same TICK
+ * logic as real-time play, but as a tight synchronous loop with no
+ * dispatch/render in between — this is what powers AFK catch-up on boot.
+ * Runs in 2s simulated steps (instead of the normal 100ms) purely for speed;
+ * every TICK accumulator is linear, so larger steps don't change the result.
+ */
+function simulateAfk(state: GameState, totalMs: number): GameState {
+  let sim = state;
+  const STEP_MS = 2000;
+  let remaining = totalMs;
+  while (remaining > 0) {
+    const step = Math.min(STEP_MS, remaining);
+    sim = applyAction(sim, { type: 'TICK', deltaMs: step });
+    remaining -= step;
+  }
+  return sim;
+}
+
+/**
  * Wraps applyAction so any net funds change (from any action) produces a
  * floating +$X / -$X delta near the Corporate Capital figure, and triggers
  * the big screen-shake (via moneyShakeId) when the change is >=60% of the
@@ -576,7 +619,10 @@ export function useGameEngine() {
     return () => window.clearInterval(interval);
   }, []);
 
-  // Bring the platform bridge up, then restore any saved career progress.
+  // Bring the platform bridge up, restore any saved career progress, and —
+  // if AFK play is unlocked and enough real-world time has passed since the
+  // last save — silently fast-forward the game and surface a "while you
+  // were gone" summary popup.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -587,7 +633,53 @@ export function useGameEngine() {
       }
       platform.gameReady();
       const save = await loadSaveData();
-      if (!cancelled && save) dispatch({ type: 'HYDRATE', data: save });
+      if (cancelled || !save) return;
+
+      dispatch({ type: 'HYDRATE', data: save });
+
+      const afkUnlocked = save.afkUnlocked ?? false;
+      const afkCap = save.afkMinutesCap ?? 0;
+      const lastSavedAt = save.lastSavedAt ?? Date.now();
+      const elapsedMs = Date.now() - lastSavedAt;
+
+      if (afkUnlocked && afkCap > 0 && elapsedMs >= AFK_MIN_TRIGGER_MS) {
+        const minutesAway = elapsedMs / 60_000;
+        const minutesToSim = Math.min(minutesAway, afkCap);
+        const baseState: GameState = { ...initialState(), ...(save as unknown as Partial<GameState>) };
+        const simmed = simulateAfk(baseState, minutesToSim * 60_000);
+
+        const ticketsGained = Math.max(0, simmed.ticketsClosed - baseState.ticketsClosed);
+        const fundsGained = simmed.funds - baseState.funds;
+        const { headline, subline } = buildAfkSummary(simmed.phase, minutesToSim, ticketsGained, fundsGained);
+
+        dispatch({
+          type: 'HYDRATE',
+          data: {
+            ...simmed,
+            // Reset anything purely cosmetic/per-frame so nothing stale replays on screen.
+            particles: [],
+            floaters: [],
+            moneyFloaters: [],
+            confettiBurst: 'none',
+            adPopup: null,
+            shake: false,
+            titleFlashMs: 0,
+            arrivalPulse: baseState.arrivalPulse,
+            autoSendPulse: baseState.autoSendPulse,
+            upgradeFlashId: baseState.upgradeFlashId,
+            moneyShakeId: baseState.moneyShakeId,
+            stamp: baseState.stamp,
+            afkSummary: {
+              id: Date.now(),
+              minutes: Math.round(minutesToSim),
+              ticketsClosed: ticketsGained,
+              fundsGained,
+              headline,
+              subline,
+            },
+          },
+        });
+      }
     })();
     return () => {
       cancelled = true;
@@ -669,6 +761,7 @@ export function useGameEngine() {
   const clearParticle = useCallback((id: number) => dispatch({ type: 'CLEAR_PARTICLE', id }), []);
   const clearFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_FLOATER', id }), []);
   const clearMoneyFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_MONEY_FLOATER', id }), []);
+  const clearAfkSummary = useCallback(() => dispatch({ type: 'CLEAR_AFK_SUMMARY' }), []);
 
   // "Insider Trading Opportunity" popup — if adsUnlocked is on, skip straight
   // to the reward; otherwise play the platform's rewarded ad and only pay
@@ -708,5 +801,6 @@ export function useGameEngine() {
     clearFloater,
     clearMoneyFloater,
     watchAd,
+    clearAfkSummary,
   };
 }
