@@ -295,7 +295,7 @@ function applyAction(state: GameState, action: Action): GameState {
       const cost = scaledMilestoneCost(def, state.promotions);
       if (state.funds < cost) return state;
 
-      const afkGain = state.afkUnlocked ? AFK_MINUTES_PER_MILESTONE : 0;
+      const afkGain = state.afkUnlocked ? AFK_MINUTES_PER_MILESTONE * state.phase : 0;
       const base: GameState = {
         ...state,
         funds: state.funds - cost,
