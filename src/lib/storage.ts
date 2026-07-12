@@ -48,8 +48,6 @@ export interface SaveData {
   ticketsClosed: number
   maxFundsEver: number
   adsUnlocked: boolean
-maxFundsEver: number
-  adsUnlocked: boolean
   afkUnlocked: boolean
   afkMinutesCap: number
   /** Epoch ms at the moment this save was written — the anchor for AFK catch-up on next boot. */
@@ -76,8 +74,6 @@ export function extractSaveData(state: GameState): SaveData {
     ticketsClosed: state.ticketsClosed,
     maxFundsEver: state.maxFundsEver,
     adsUnlocked: state.adsUnlocked,
- maxFundsEver: state.maxFundsEver,
-    adsUnlocked: state.adsUnlocked,
     afkUnlocked: state.afkUnlocked,
     afkMinutesCap: state.afkMinutesCap,
     lastSavedAt: Date.now(),
@@ -97,29 +93,29 @@ function tryParseSaveData(raw: unknown): unknown | null {
   if (raw === null || raw === undefined) return null
 
   if (typeof raw === 'object') {
-    console.log('[Storage] raw value was already an object, skipping JSON.parse')
+    // console.log('[Storage] raw value was already an object, skipping JSON.parse')
     return raw
   }
 
   if (typeof raw !== 'string') {
-    console.error('[Storage] raw value was an unexpected type:', typeof raw, raw)
+    // console.error('[Storage] raw value was an unexpected type:', typeof raw, raw)
     return null
   }
 
   try {
     return JSON.parse(raw)
   } catch (e) {
-    console.warn('[Storage] direct JSON.parse failed, attempting recovery…', e)
+    // console.warn('[Storage] direct JSON.parse failed, attempting recovery…', e)
   }
 
   if (raw.length > 1 && raw.startsWith('"') && raw.endsWith('"')) {
     const unwrapped = raw.slice(1, -1)
     try {
       const recovered = JSON.parse(unwrapped)
-      console.warn('[Storage] recovered save after stripping an extra outer quote layer')
+      // console.warn('[Storage] recovered save after stripping an extra outer quote layer')
       return recovered
     } catch (e) {
-      console.error('[Storage] recovery attempt also failed', e)
+      // console.error('[Storage] recovery attempt also failed', e)
     }
   }
 
@@ -130,38 +126,38 @@ function tryParseSaveData(raw: unknown): unknown | null {
 export async function loadSaveData(): Promise<SaveData | null> {
   try {
     const raw = await platform.storageGet(STORAGE_KEY)
-    console.log('[Storage] loadSaveData raw =', raw, 'typeof =', typeof raw)
+    // console.log('[Storage] loadSaveData raw =', raw, 'typeof =', typeof raw)
     if (!raw) {
-      console.log('[Storage] no saved game, starting fresh')
+      // console.log('[Storage] no saved game, starting fresh')
       return null
     }
 
     const parsed = tryParseSaveData(raw)
     if (parsed === null) {
-      console.error('[Storage] could not parse saved game at all, starting fresh. Raw value was:', raw)
+      // console.error('[Storage] could not parse saved game at all, starting fresh. Raw value was:', raw)
       return null
     }
 
-    console.log('[Storage] loaded save', parsed)
+    // console.log('[Storage] loaded save', parsed)
 
     // If raw wasn't already a clean JSON string matching `parsed` (either it
     // was a pre-parsed object, or we had to recover it from a double-quoted
     // string), re-save in the canonical string format now.
     const isCleanString = typeof raw === 'string' && raw === JSON.stringify(parsed)
     if (!isCleanString) {
-      console.log('[Storage] re-saving in canonical format after non-standard load')
+      // console.log('[Storage] re-saving in canonical format after non-standard load')
       saveGame(parsed as SaveData)
     }
 
     return parsed as SaveData
   } catch (e) {
-    console.error('[Storage] loadSaveData failed, starting fresh', e)
+    // console.error('[Storage] loadSaveData failed, starting fresh', e)
     return null
   }
 }
 
 export function saveGame(data: SaveData): void {
-  console.log('[Storage] saveGame', data)
+  // console.log('[Storage] saveGame', data)
   platform.storageSet(STORAGE_KEY, JSON.stringify(data))
     .then(() => console.log('[Storage] save OK'))
     .catch(e => console.error('[Storage] save FAILED', e))

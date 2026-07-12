@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback, useRef } from 'react';
+import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import type { GameState, Ticket, FloatingParticle, MoneyFloater } from '../game/types';
 import {
   UPGRADES,
@@ -614,8 +614,29 @@ export function useGameEngine() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // ── Start-menu gating ────────────────────────────────────────────────
+  // The game boots straight into the reducer's initial state as always
+  // (cheap, synchronous, no flash-of-wrong-content), but the tick loop is
+  // held off via `startedRef` until the player actually presses the
+  // start/continue button on the menu — that way tickets don't pile up
+  // and funds don't move while they're just staring at the title screen.
+  // `saveChecked`/`hasSave` let the menu know whether to offer "start a
+  // new career" or "continue" wording, and whether it's safe to render
+  // stats yet (state is only trustworthy once HYDRATE has landed).
+  const [saveChecked, setSaveChecked] = useState(false);
+  const [hasSave, setHasSave] = useState(false);
+  const startedRef = useRef(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const start = useCallback(() => {
+    startedRef.current = true;
+    setHasStarted(true);
+  }, []);
+
   useEffect(() => {
-    const interval = window.setInterval(() => dispatch({ type: 'TICK', deltaMs: 100 }), 100);
+    const interval = window.setInterval(() => {
+      if (startedRef.current) dispatch({ type: 'TICK', deltaMs: 100 });
+    }, 100);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -633,8 +654,14 @@ export function useGameEngine() {
       }
       platform.gameReady();
       const save = await loadSaveData();
-      if (cancelled || !save) return;
+      if (cancelled) return;
 
+      if (!save) {
+        setSaveChecked(true);
+        return;
+      }
+
+      setHasSave(true);
       dispatch({ type: 'HYDRATE', data: save });
 
       const afkUnlocked = save.afkUnlocked ?? false;
@@ -680,6 +707,8 @@ export function useGameEngine() {
           },
         });
       }
+
+      setSaveChecked(true);
     })();
     return () => {
       cancelled = true;
@@ -802,5 +831,9 @@ export function useGameEngine() {
     clearMoneyFloater,
     watchAd,
     clearAfkSummary,
+    saveChecked,
+    hasSave,
+    hasStarted,
+    start,
   };
 }

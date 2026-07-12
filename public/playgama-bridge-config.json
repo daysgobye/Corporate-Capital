@@ -1,0 +1,23 @@
+{
+  "advertisement": {
+    "useBuiltInErrorPopup": true,
+    "rewarded": {
+      "placements": [
+        {
+          "id": "insider_trading_tip"
+        }
+      ],
+      "preloadOnStart": true
+    }
+  },
+  "sendAnalyticsEvents": true,
+  "disableLoadingLogo": true,
+  "showFullLoadingLogo": true,
+  "device": {
+    "useBuiltInOrientationPopup": true,
+    "supportedOrientations": [
+      "landscape",
+      "portrait"
+    ]
+  }
+}
