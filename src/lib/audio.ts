@@ -1,30 +1,55 @@
+// src/lib/audio.ts
+import { platform } from './platform'
+
 let audioCtx: AudioContext | null = null
 
 const MUTE_KEY = 'hct_muted'
 
-let muted = (() => {
-  try {
-    return localStorage.getItem(MUTE_KEY) === '1'
-  } catch {
-    return false
-  }
-})()
+let muted = false
+let mutedInitialized = false
+const mutedListeners = new Set<(muted: boolean) => void>()
+
+function notifyMuted() {
+  mutedListeners.forEach((l) => l(muted))
+}
 
 export function isMuted(): boolean {
   return muted
 }
 
+/** Subscribe to mute changes (including the async platform-storage load resolving). Returns an unsubscribe fn. */
+export function subscribeMuted(listener: (muted: boolean) => void): () => void {
+  mutedListeners.add(listener)
+  return () => mutedListeners.delete(listener)
+}
+
+/** Call once on boot (alongside platform.init()) to hydrate the mute flag from platform storage. */
+export async function initMuted(): Promise<void> {
+  if (mutedInitialized) return
+  mutedInitialized = true
+  try {
+    const stored = await platform.storageGet(MUTE_KEY)
+    // Defensive per IPlatform's note: some bridges hand back a non-string.
+    if (stored === '1' || stored === '0') {
+      muted = stored === '1'
+      notifyMuted()
+    }
+  } catch {
+    // keep default (unmuted)
+  }
+}
+
 export function setMuted(value: boolean): void {
   muted = value
-  try {
-    localStorage.setItem(MUTE_KEY, muted ? '1' : '0')
-  } catch { }
+  notifyMuted()
+  platform.storageSet(MUTE_KEY, muted ? '1' : '0').catch(() => { })
 }
 
 export function toggleMute(): boolean {
   setMuted(!muted)
   return muted
 }
+
 
 function getCtx(): AudioContext {
   if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()

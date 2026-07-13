@@ -1,32 +1,17 @@
-# React + TypeScript + Vite
+Game description
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Corporate Capital is a satirical idle/clicker game about grinding your way up the corporate ladder, one soul-crushing customer service ticket at a time. Mash keys to draft replies, fire off canned corporate jargon, and watch the tickets pile up. Reinvest your earnings into upgrades, outsource your job to overseas agents, then replace them with an AI chatbot; because nothing says "synergy" like automating yourself out of relevance. Get promoted, start the grind over as HR, deny leave requests, deploy HR bots, then fire your own middle managers and do it all again. It's an incremental clicker with a dark corporate-satire twist: the more efficient you get, the less anyone (including you) is actually needed.
 
-Currently, two official plugins are available:
+How to play
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Climb the corporate ladder by resolving tickets, earning Corporate Capital, and buying upgrades and milestones until you can accept a promotion; then do it all again in a new, more absurd role. There's no traditional "win," just an ever-escalating loop of automation and promotion.
 
-## React Compiler
+Desktop Controls:
+Any letter/number/space key: Type out a reply to the active ticket.
+Enter: Send the reply once it's ready (or add a keystroke if it isn't).
+Mouse Click: Buy upgrades and milestones, use canned response buttons, mute/unmute audio.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Mobile Controls:
+On-Screen Keyboard: Tap any key to draft your reply.
+Tap: Send button, canned response buttons, upgrade/milestone purchases.
+Tab Bar: Switch between Queue, Dashboard, and Upgrades panels.

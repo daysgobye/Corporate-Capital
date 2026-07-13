@@ -1394,3 +1394,92 @@ body {
     font-size: 26px;
   }
 }
+
+/* ---------- Phase-transition "loading screen" (disguises the interstitial ad) ---------- */
+.phase-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  animation: afk-overlay-in 0.2s ease-out;
+}
+
+.phase-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.phase-loading-spinner {
+  width: 46px;
+  height: 46px;
+  border: 5px solid rgba(255, 252, 239, 0.25);
+  border-top-color: var(--highlight-yellow);
+  border-radius: 50%;
+  animation: phase-loading-spin 0.9s linear infinite;
+}
+
+.phase-loading-text {
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  color: var(--paper);
+  text-align: center;
+  max-width: 260px;
+}
+
+@keyframes phase-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phase-loading-spinner {
+    animation: none !important;
+  }
+}
+
+/* ---------- AFK "double your earnings" ad button ---------- */
+.afk-bonus-btn {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+  background: var(--highlight-yellow);
+  border: 3px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  animation: send-btn-beckon 1.1s ease-in-out infinite;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.afk-bonus-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--border);
+}
+
+.afk-bonus-btn:active {
+  transform: translate(2px, 2px) scale(0.97);
+  box-shadow: 1px 1px 0 var(--border);
+}
+
+.afk-bonus-claimed {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
+  color: var(--panel);
+  background: var(--synergy-green);
+  border: 3px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+}

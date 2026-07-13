@@ -22,6 +22,7 @@ import {
   AFK_MINUTES_PER_MILESTONE,
   AFK_MAX_CAP_MINUTES,
   AFK_MIN_TRIGGER_MS,
+  AFK_PAYOUT_FACTOR,
   buildAfkSummary,
 } from '../game/content';
 import { audio } from '../lib/audio';
@@ -37,6 +38,13 @@ const AGENT_UPKEEP_INTERVAL_MS = 3000;
 // had beforehand triggers the big screen shake — small trickles of income
 // shouldn't rattle the screen, but losing/gaining a huge chunk should.
 const MONEY_SHAKE_PCT = 0.6;
+
+/** Simple promise-based delay — used to keep the disguised "loading screen"
+ * phase transition from flashing instantly when there's no real interstitial
+ * ad to show (e.g. local dev on NullPlatform). */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 function makeTicket(id: number): Ticket {
   return { id, requiredChars: 90 + Math.floor(Math.random() * 40) };
@@ -106,6 +114,7 @@ type Action =
   | { type: 'HYDRATE'; data: Partial<GameState> }
   | { type: 'CLEAR_MONEY_FLOATER'; id: number }
   | { type: 'CLAIM_AD_REWARD' }
+  | { type: 'CLAIM_AFK_BONUS' }
   | { type: 'CLEAR_AFK_SUMMARY' };
 
 function upLevel(state: GameState, id: string): number {
@@ -325,7 +334,7 @@ function applyAction(state: GameState, action: Action): GameState {
           // Carry these forward across a prestige reset — the ad reward stays
           // meaningful and doesn't get an easy popup right as you reset, and
           // the AFK allowance is real career progress too.
-          maxFundsEver: state.maxFundsEver,
+          maxFundsEver: 0,
           adTimerMs: state.adTimerMs,
           adsUnlocked: state.adsUnlocked,
           afkMinutesCap: base.afkMinutesCap,
@@ -357,6 +366,15 @@ function applyAction(state: GameState, action: Action): GameState {
         ...state,
         funds: state.funds + state.adPopup.rewardAmount,
         adPopup: null,
+      };
+    }
+
+    case 'CLAIM_AFK_BONUS': {
+      if (!state.afkSummary || state.afkSummary.bonusClaimed) return state;
+      return {
+        ...state,
+        funds: state.funds + state.afkSummary.fundsGained,
+        afkSummary: { ...state.afkSummary, bonusClaimed: true },
       };
     }
 
@@ -628,6 +646,13 @@ export function useGameEngine() {
   const startedRef = useRef(false);
   const [hasStarted, setHasStarted] = useState(false);
 
+  // ── Disguised interstitial ("loading screen") on phase transitions ────
+  // While true, App renders a full-screen "processing your promotion"
+  // loading card. The platform's real interstitial ad plays underneath/on
+  // top of it during that window, so it reads to the player as a load
+  // transition rather than an ad break.
+  const [phaseTransitioning, setPhaseTransitioning] = useState(false);
+
   const start = useCallback(() => {
     startedRef.current = true;
     setHasStarted(true);
@@ -676,13 +701,19 @@ export function useGameEngine() {
         const simmed = simulateAfk(baseState, minutesToSim * 60_000);
 
         const ticketsGained = Math.max(0, simmed.ticketsClosed - baseState.ticketsClosed);
-        const fundsGained = simmed.funds - baseState.funds;
+        const rawFundsGained = simmed.funds - baseState.funds;
+        // Only credit a fraction of what the simulation actually produced —
+        // the rest is recoverable via the "watch an ad to double" button on
+        // the summary popup below.
+        const fundsGained = Math.round(rawFundsGained * AFK_PAYOUT_FACTOR);
+        const adjustedFunds = baseState.funds + fundsGained;
         const { headline, subline } = buildAfkSummary(simmed.phase, minutesToSim, ticketsGained, fundsGained);
 
         dispatch({
           type: 'HYDRATE',
           data: {
             ...simmed,
+            funds: adjustedFunds,
             // Reset anything purely cosmetic/per-frame so nothing stale replays on screen.
             particles: [],
             floaters: [],
@@ -703,6 +734,7 @@ export function useGameEngine() {
               fundsGained,
               headline,
               subline,
+              bonusClaimed: false,
             },
           },
         });
@@ -783,6 +815,21 @@ export function useGameEngine() {
   }, []);
 
   const buyMilestone = useCallback((id: string) => {
+    const isPhaseTransition = id === 'acceptPromotion' || id === 'executiveReset';
+
+    if (isPhaseTransition) {
+      // Disguise the mandatory interstitial ad as a "processing your
+      // promotion" loading screen. The minimum delay keeps the transition
+      // from flashing instantly when there's no real ad bridge (local dev).
+      setPhaseTransitioning(true);
+      Promise.allSettled([platform.showInterstitial(id), delay(1500)]).finally(() => {
+        audio.win();
+        dispatch({ type: 'BUY_MILESTONE', id });
+        setPhaseTransitioning(false);
+      });
+      return;
+    }
+
     audio.win();
     dispatch({ type: 'BUY_MILESTONE', id });
   }, []);
@@ -816,6 +863,23 @@ export function useGameEngine() {
     }
   }, []);
 
+  // AFK "welcome back" summary — lets the player watch a rewarded ad to
+  // double the (already-nerfed) earnings shown on the popup.
+  const claimAfkBonus = useCallback(async () => {
+    const summary = stateRef.current.afkSummary;
+    if (!summary || summary.bonusClaimed || summary.fundsGained <= 0) return;
+
+    try {
+      const rewarded = await platform.showRewarded('afk_double_bonus');
+      if (rewarded) {
+        audio.win();
+        dispatch({ type: 'CLAIM_AFK_BONUS' });
+      }
+    } catch (e) {
+      console.error('[Game] showRewarded (AFK bonus) failed', e);
+    }
+  }, []);
+
   const currentTitle = `${state.titleModifiers.join(' ')} ${BASE_TITLE[state.phase]}`.trim();
 
   return {
@@ -831,6 +895,8 @@ export function useGameEngine() {
     clearMoneyFloater,
     watchAd,
     clearAfkSummary,
+    claimAfkBonus,
+    phaseTransitioning,
     saveChecked,
     hasSave,
     hasStarted,

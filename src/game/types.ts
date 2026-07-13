@@ -73,9 +73,18 @@ export interface AdPopupState {
   /** The joke one-liner body copy for this particular popup. */
   copy: string;
 }
-
+export interface AfkSummaryState {
+  id: number;
+  minutes: number;
+  ticketsClosed: number;
+  fundsGained: number;
+  headline: string;
+  subline: string;
+  /** Whether the player watched an ad to double the (already-nerfed) fundsGained. */
+  bonusClaimed: boolean;
+}
 export interface GameState {
-/** Total AFK-play minutes unlocked so far via automation + milestones. */
+  /** Total AFK-play minutes unlocked so far via automation + milestones. */
   afkMinutesCap: number;
   /** True once the first automation upgrade in a phase has been bought. */
   afkUnlocked: boolean;

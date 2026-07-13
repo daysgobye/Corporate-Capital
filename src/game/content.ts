@@ -572,7 +572,7 @@ export const AFK_BASE_MINUTES_ON_UNLOCK = 10;
 export const AFK_MINUTES_PER_MILESTONE = 15;
 export const AFK_MAX_CAP_MINUTES = 240;
 export const AFK_MIN_TRIGGER_MS = 60_000;
-
+export const AFK_PAYOUT_FACTOR = 1 / 3;
 export const AFK_HEADLINES: Record<Phase, string[]> = {
   1: [
     "THE INBOX DIDN'T WAIT FOR YOU",

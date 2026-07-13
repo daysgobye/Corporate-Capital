@@ -8,6 +8,7 @@ import EffectsLayer from './components/EffectsLayer';
 import MobileTabBar from './components/MobileTabBar';
 import AdPopup from './components/AdPopup';
 import AfkSummaryPopup from './components/AfkSummaryPopup';
+import PhaseLoadingScreen from './components/PhaseLoadingScreen';
 import type { MobileTab } from './components/MobileTabBar';
 import './game/game.css';
 import StartMenu from './components/StartMenu';
@@ -16,6 +17,7 @@ function App() {
   const {
     state, currentTitle, keypress, send, useCanned, buyUpgrade, buyMilestone,
     clearParticle, clearFloater, clearMoneyFloater, watchAd, clearAfkSummary,
+    claimAfkBonus, phaseTransitioning,
     saveChecked, hasSave, hasStarted, start,
   } = useGameEngine();
   const [mobileTab, setMobileTab] = useState<MobileTab>('queue');
@@ -65,13 +67,11 @@ function App() {
 
       <EffectsLayer state={state} onClearParticle={clearParticle} onClearFloater={clearFloater} />
 
-      {/* Rendered at the app-shell's top level (outside panels-grid) so it always
-          shows on top regardless of which mobile tab is currently active. */}
       <AdPopup state={state} onWatch={watchAd} />
 
-      {/* Boot-time "while you were gone" AFK catch-up summary — also rendered
-          at the top level so it overlays everything, including the ad popup. */}
-      <AfkSummaryPopup state={state} onDismiss={clearAfkSummary} />
+      <AfkSummaryPopup state={state} onDismiss={clearAfkSummary} onClaimBonus={claimAfkBonus} />
+
+      {phaseTransitioning && <PhaseLoadingScreen />}
     </div>
   );
 }
