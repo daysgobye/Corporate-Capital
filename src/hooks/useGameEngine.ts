@@ -10,7 +10,6 @@ import {
   CURRENCY_LABEL,
   scaledUpgradeCost,
   scaledMilestoneCost,
-  PRESTIGE_COST_SCALE,
   TICKET_SPAWN_BASE_INTERVAL_MS,
   TICKET_SPAWN_UPGRADE_MODIFIERS,
   TICKET_SPAWN_MILESTONE_MS,
@@ -27,7 +26,7 @@ import {
 } from '../game/content';
 import { audio } from '../lib/audio';
 import { platform } from '../lib/platform';
-import { loadSaveData, saveGame, extractSaveData, type SaveData } from '../lib/storage';
+import { loadSaveData, saveGame, extractSaveData } from '../lib/storage';
 
 const MAX_QUEUE = 40;
 const TITLE_FLASH_MS = 2600;
