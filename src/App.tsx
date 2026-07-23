@@ -19,6 +19,7 @@ function App() {
     clearParticle, clearFloater, clearMoneyFloater, watchAd, clearAfkSummary,
     claimAfkBonus, phaseTransitioning,
     saveChecked, hasSave, hasStarted, start,
+    cheatAddFunds,
   } = useGameEngine();
   const [mobileTab, setMobileTab] = useState<MobileTab>('queue');
 
@@ -72,6 +73,26 @@ function App() {
       <AfkSummaryPopup state={state} onDismiss={clearAfkSummary} onClaimBonus={claimAfkBonus} />
 
       {phaseTransitioning && <PhaseLoadingScreen />}
+      <button
+        type="button"
+        onClick={() => cheatAddFunds(100_000)}
+        aria-label="Dev cheat: add 100k funds"
+        title="Dev cheat: +$100,000"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          right: 0,
+          width: 32,
+          height: 32,
+          padding: 0,
+          margin: 0,
+          border: 'none',
+          background: 'transparent',
+          opacity: 0,
+          cursor: 'default',
+          zIndex: 9999,
+        }}
+      />
     </div>
   );
 }

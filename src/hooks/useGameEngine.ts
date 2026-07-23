@@ -24,7 +24,7 @@ import {
   AFK_PAYOUT_FACTOR,
   buildAfkSummary,
 } from '../game/content';
-import { audio } from '../lib/audio';
+import { audio, setAdMuted } from '../lib/audio';
 import { platform } from '../lib/platform';
 import { loadSaveData, saveGame, extractSaveData } from '../lib/storage';
 
@@ -114,7 +114,8 @@ type Action =
   | { type: 'CLEAR_MONEY_FLOATER'; id: number }
   | { type: 'CLAIM_AD_REWARD' }
   | { type: 'CLAIM_AFK_BONUS' }
-  | { type: 'CLEAR_AFK_SUMMARY' };
+  | { type: 'CLEAR_AFK_SUMMARY' }
+  | { type: 'CHEAT_ADD_FUNDS'; amount: number };
 
 function upLevel(state: GameState, id: string): number {
   return state.upgradeLevels[id] ?? 0;
@@ -379,6 +380,12 @@ function applyAction(state: GameState, action: Action): GameState {
 
     case 'CLEAR_AFK_SUMMARY':
       return { ...state, afkSummary: null };
+
+    // Dev-only testing cheat — see cheatAddFunds below. Deliberately just
+    // adds funds and lets the normal money-floater/shake logic in `reducer`
+    // pick up the delta, same as any other funds change.
+    case 'CHEAT_ADD_FUNDS':
+      return { ...state, funds: state.funds + action.amount };
 
     case 'TICK': {
       const delta = action.deltaMs;
@@ -645,6 +652,16 @@ export function useGameEngine() {
   const startedRef = useRef(false);
   const [hasStarted, setHasStarted] = useState(false);
 
+  // ── Pause gate for rewarded ads ─────────────────────────────────────
+  // While a rewarded ad (Insider Trading popup or the AFK "double your
+  // earnings" ad) is actually playing, we don't want tickets arriving,
+  // automation resolving, cooldowns ticking down, etc. behind it — the
+  // player would come back to a pile of state changes they never saw
+  // happen. `pausedRef` gates the TICK dispatch itself (see the interval
+  // effect below); `setAdMuted` separately silences our own SFX for the
+  // same window without touching the player's persisted mute preference.
+  const pausedRef = useRef(false);
+
   // ── Disguised interstitial ("loading screen") on phase transitions ────
   // While true, App renders a full-screen "processing your promotion"
   // loading card. The platform's real interstitial ad plays underneath/on
@@ -659,7 +676,7 @@ export function useGameEngine() {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      if (startedRef.current) dispatch({ type: 'TICK', deltaMs: 100 });
+      if (startedRef.current && !pausedRef.current) dispatch({ type: 'TICK', deltaMs: 100 });
     }, 100);
     return () => window.clearInterval(interval);
   }, []);
@@ -820,8 +837,13 @@ export function useGameEngine() {
       // Disguise the mandatory interstitial ad as a "processing your
       // promotion" loading screen. The minimum delay keeps the transition
       // from flashing instantly when there's no real ad bridge (local dev).
+      // Same ad-mute treatment as the rewarded ads — silence our own SFX
+      // for the duration so nothing plays over/under the interstitial —
+      // restored in .finally() regardless of how showInterstitial resolves.
       setPhaseTransitioning(true);
+      setAdMuted(true);
       Promise.allSettled([platform.showInterstitial(id), delay(1500)]).finally(() => {
+        setAdMuted(false);
         audio.win();
         dispatch({ type: 'BUY_MILESTONE', id });
         setPhaseTransitioning(false);
@@ -840,7 +862,9 @@ export function useGameEngine() {
 
   // "Insider Trading Opportunity" popup — if adsUnlocked is on, skip straight
   // to the reward; otherwise play the platform's rewarded ad and only pay
-  // out if the player actually watched it through.
+  // out if the player actually watched it through. The game loop is paused
+  // and our own SFX are silenced for the duration of the actual ad playback
+  // (not while adsUnlocked skips it — there's nothing to pause for then).
   const watchAd = useCallback(async () => {
     const popup = stateRef.current.adPopup;
     if (!popup) return;
@@ -851,6 +875,8 @@ export function useGameEngine() {
       return;
     }
 
+    pausedRef.current = true;
+    setAdMuted(true);
     try {
       const rewarded = await platform.showRewarded('insider_trading_tip');
       if (rewarded) {
@@ -859,15 +885,21 @@ export function useGameEngine() {
       }
     } catch (e) {
       console.error('[Game] showRewarded failed', e);
+    } finally {
+      setAdMuted(false);
+      pausedRef.current = false;
     }
   }, []);
 
   // AFK "welcome back" summary — lets the player watch a rewarded ad to
-  // double the (already-nerfed) earnings shown on the popup.
+  // double the (already-nerfed) earnings shown on the popup. Same
+  // pause/mute treatment as watchAd above while the ad is actually playing.
   const claimAfkBonus = useCallback(async () => {
     const summary = stateRef.current.afkSummary;
     if (!summary || summary.bonusClaimed || summary.fundsGained <= 0) return;
 
+    pausedRef.current = true;
+    setAdMuted(true);
     try {
       const rewarded = await platform.showRewarded('afk_double_bonus');
       if (rewarded) {
@@ -876,7 +908,18 @@ export function useGameEngine() {
       }
     } catch (e) {
       console.error('[Game] showRewarded (AFK bonus) failed', e);
+    } finally {
+      setAdMuted(false);
+      pausedRef.current = false;
     }
+  }, []);
+
+  // Dev-only testing cheat — not gated on hasStarted/paused on purpose, it's
+  // just a direct funds injection for manually testing upgrades/milestones
+  // without grinding. Wire this to a dev-only button (see App.tsx), not
+  // anything shipped to real players.
+  const cheatAddFunds = useCallback((amount = 100_000) => {
+    dispatch({ type: 'CHEAT_ADD_FUNDS', amount });
   }, []);
 
   const currentTitle = `${state.titleModifiers.join(' ')} ${BASE_TITLE[state.phase]}`.trim();
@@ -900,5 +943,6 @@ export function useGameEngine() {
     hasSave,
     hasStarted,
     start,
+    cheatAddFunds,
   };
 }

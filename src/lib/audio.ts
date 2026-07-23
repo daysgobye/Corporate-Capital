@@ -9,6 +9,21 @@ let muted = false
 let mutedInitialized = false
 const mutedListeners = new Set<(muted: boolean) => void>()
 
+/**
+ * Separate from the player's persisted `muted` preference — this is a
+ * transient "shut up while a rewarded/interstitial ad is playing" flag.
+ * It's intentionally NOT wired into `mutedListeners`/storage: it shouldn't
+ * flip the mute button's UI or overwrite the player's real preference, it
+ * should just silence our own SFX for the duration of the ad so they don't
+ * play over/under it, then quietly restore whatever the player's actual
+ * preference was once the ad is done.
+ */
+let adMuted = false
+
+export function setAdMuted(value: boolean): void {
+  adMuted = value
+}
+
 function notifyMuted() {
   mutedListeners.forEach((l) => l(muted))
 }
@@ -57,7 +72,7 @@ function getCtx(): AudioContext {
 }
 
 function playTone(freq: number, type: OscillatorType, duration: number, gain = 0.3, delay = 0) {
-  if (muted) return
+  if (muted || adMuted) return
   try {
     const ac = getCtx()
     const osc = ac.createOscillator()
