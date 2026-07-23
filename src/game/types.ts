@@ -84,6 +84,7 @@ export interface AfkSummaryState {
   bonusClaimed: boolean;
 }
 export interface GameState {
+  starterAdOffered: boolean;
   /** Total AFK-play minutes unlocked so far via automation + milestones. */
   afkMinutesCap: number;
   /** True once the first automation upgrade in a phase has been bought. */

@@ -559,6 +559,31 @@ export const AD_TIP_LINES_UNLOCKED: string[] = [
   'Your lawyer says this is fine. You do not have a lawyer.',
 ];
 
+/**
+ * === Starter boost ("Welcome Bonus") tuning ===
+ * A one-time rewarded-ad offer shown shortly after a brand-new career
+ * begins — separate from the recurring "Insider Trading Opportunity"
+ * timer, which keeps running normally the whole rest of the game.
+ */
+export const STARTER_AD_DELAY_MS = 6_000;
+
+/** Fixed payout — deliberately generous relative to the ~$25-60 cost of the first upgrades. */
+export const STARTER_AD_REWARD = 500;
+
+export const STARTER_AD_EYEBROW = 'Welcome Bonus';
+
+export const STARTER_AD_LINES: string[] = [
+  'HR left an envelope on your very first desk.',
+  'A mysterious benefactor believes in your potential (for now).',
+  'The break room fridge has a suspiciously generous new-hire bonus.',
+  "Someone pre-loaded your drawer with severance from a job you haven't started yet.",
+  'Orientation included a surprise signing bonus. No one will explain why.',
+  'IT accidentally left a company credit card logged in. Just this once.',
+];
+
+export function pickStarterAdCopy(): string {
+  return STARTER_AD_LINES[Math.floor(Math.random() * STARTER_AD_LINES.length)];
+}
 /** Picks a fresh eyebrow + one-liner combo for a newly-spawned popup. */
 export function pickAdFlavor(adsUnlocked: boolean): { eyebrow: string; copy: string } {
   const eyebrow = AD_TIP_EYEBROWS[Math.floor(Math.random() * AD_TIP_EYEBROWS.length)];

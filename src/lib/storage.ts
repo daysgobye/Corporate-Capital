@@ -30,6 +30,7 @@ const STORAGE_KEY = 'hct_save_v1-13'
 
 /** The subset of GameState worth persisting between sessions. */
 export interface SaveData {
+  starterAdOffered: boolean
   nextId: number
   phase: Phase
   promotions: number
@@ -56,6 +57,9 @@ export interface SaveData {
 
 export function extractSaveData(state: GameState): SaveData {
   return {
+    afkMinutesCap: state.afkMinutesCap,
+    starterAdOffered: state.starterAdOffered,
+    lastSavedAt: Date.now(),
     nextId: state.nextId,
     phase: state.phase,
     promotions: state.promotions,
@@ -75,8 +79,6 @@ export function extractSaveData(state: GameState): SaveData {
     maxFundsEver: state.maxFundsEver,
     adsUnlocked: state.adsUnlocked,
     afkUnlocked: state.afkUnlocked,
-    afkMinutesCap: state.afkMinutesCap,
-    lastSavedAt: Date.now(),
   }
 }
 

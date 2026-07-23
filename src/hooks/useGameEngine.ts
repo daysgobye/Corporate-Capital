@@ -16,6 +16,10 @@ import {
   computeAdReward,
   randomAdDelayMs,
   pickAdFlavor,
+  STARTER_AD_DELAY_MS,
+  STARTER_AD_REWARD,
+  STARTER_AD_EYEBROW,
+  pickStarterAdCopy,
   AFK_UNLOCK_UPGRADE_IDS,
   AFK_BASE_MINUTES_ON_UNLOCK,
   AFK_MINUTES_PER_MILESTONE,
@@ -93,6 +97,7 @@ function initialState(): GameState {
     adTimerMs: randomAdDelayMs(),
     adPopup: null,
     adsUnlocked: false,
+    starterAdOffered: false,
     afkMinutesCap: 0,
     afkUnlocked: false,
     lastSavedAt: Date.now(),
@@ -113,6 +118,7 @@ type Action =
   | { type: 'HYDRATE'; data: Partial<GameState> }
   | { type: 'CLEAR_MONEY_FLOATER'; id: number }
   | { type: 'CLAIM_AD_REWARD' }
+  | { type: 'SHOW_STARTER_AD' }
   | { type: 'CLAIM_AFK_BONUS' }
   | { type: 'CLEAR_AFK_SUMMARY' }
   | { type: 'CHEAT_ADD_FUNDS'; amount: number };
@@ -337,6 +343,10 @@ function applyAction(state: GameState, action: Action): GameState {
           maxFundsEver: 0,
           adTimerMs: state.adTimerMs,
           adsUnlocked: state.adsUnlocked,
+          // The starter offer is a one-time-per-career thing, not per-phase —
+          // carry the "already offered" flag through prestige resets so it
+          // doesn't pop back up on every promotion loop.
+          starterAdOffered: state.starterAdOffered,
           afkMinutesCap: base.afkMinutesCap,
           afkUnlocked: state.afkUnlocked,
         };
@@ -366,6 +376,24 @@ function applyAction(state: GameState, action: Action): GameState {
         ...state,
         funds: state.funds + state.adPopup.rewardAmount,
         adPopup: null,
+      };
+    }
+
+    case 'SHOW_STARTER_AD': {
+      // One-time "Welcome Bonus" offer for a brand-new career. Guarded so it
+      // can never fire twice, and it nudges the normal recurring popup timer
+      // out a bit so the two don't collide right on top of each other.
+      if (state.starterAdOffered) return state;
+      return {
+        ...state,
+        starterAdOffered: true,
+        adPopup: {
+          id: state.adPopup ? state.adPopup.id + 1 : 1,
+          rewardAmount: STARTER_AD_REWARD,
+          eyebrow: STARTER_AD_EYEBROW,
+          copy: pickStarterAdCopy(),
+        },
+        adTimerMs: randomAdDelayMs(),
       };
     }
 
@@ -634,6 +662,7 @@ function reducer(state: GameState, action: Action): GameState {
 export function useGameEngine() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const confettiTimer = useRef<number | null>(null);
+  const starterAdTimerRef = useRef<number | null>(null);
   const prevArrivalPulse = useRef(state.arrivalPulse);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -653,13 +682,14 @@ export function useGameEngine() {
   const [hasStarted, setHasStarted] = useState(false);
 
   // ── Pause gate for rewarded ads ─────────────────────────────────────
-  // While a rewarded ad (Insider Trading popup or the AFK "double your
-  // earnings" ad) is actually playing, we don't want tickets arriving,
-  // automation resolving, cooldowns ticking down, etc. behind it — the
-  // player would come back to a pile of state changes they never saw
-  // happen. `pausedRef` gates the TICK dispatch itself (see the interval
-  // effect below); `setAdMuted` separately silences our own SFX for the
-  // same window without touching the player's persisted mute preference.
+  // While a rewarded ad (Insider Trading popup, the starter Welcome Bonus
+  // popup, or the AFK "double your earnings" ad) is actually playing, we
+  // don't want tickets arriving, automation resolving, cooldowns ticking
+  // down, etc. behind it — the player would come back to a pile of state
+  // changes they never saw happen. `pausedRef` gates the TICK dispatch
+  // itself (see the interval effect below); `setAdMuted` separately
+  // silences our own SFX for the same window without touching the
+  // player's persisted mute preference.
   const pausedRef = useRef(false);
 
   // ── Disguised interstitial ("loading screen") on phase transitions ────
@@ -672,13 +702,32 @@ export function useGameEngine() {
   const start = useCallback(() => {
     startedRef.current = true;
     setHasStarted(true);
-  }, []);
+
+    // One-time "Welcome Bonus" rewarded-ad offer — only for a genuinely new
+    // career (never when continuing a save), and only once per career
+    // (guarded again inside the reducer via `starterAdOffered`). Delayed a
+    // few seconds so it doesn't compete with the very first render.
+    if (!hasSave) {
+      starterAdTimerRef.current = window.setTimeout(() => {
+        if (!stateRef.current.starterAdOffered) {
+          dispatch({ type: 'SHOW_STARTER_AD' });
+        }
+      }, STARTER_AD_DELAY_MS);
+    }
+  }, [hasSave]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (startedRef.current && !pausedRef.current) dispatch({ type: 'TICK', deltaMs: 100 });
     }, 100);
     return () => window.clearInterval(interval);
+  }, []);
+
+  // Clean up the starter-ad timeout if the component unmounts before it fires.
+  useEffect(() => {
+    return () => {
+      if (starterAdTimerRef.current) window.clearTimeout(starterAdTimerRef.current);
+    };
   }, []);
 
   // Bring the platform bridge up, restore any saved career progress, and —
@@ -860,11 +909,13 @@ export function useGameEngine() {
   const clearMoneyFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_MONEY_FLOATER', id }), []);
   const clearAfkSummary = useCallback(() => dispatch({ type: 'CLEAR_AFK_SUMMARY' }), []);
 
-  // "Insider Trading Opportunity" popup — if adsUnlocked is on, skip straight
-  // to the reward; otherwise play the platform's rewarded ad and only pay
-  // out if the player actually watched it through. The game loop is paused
-  // and our own SFX are silenced for the duration of the actual ad playback
-  // (not while adsUnlocked skips it — there's nothing to pause for then).
+  // "Insider Trading Opportunity" popup (and the starter "Welcome Bonus"
+  // popup, which reuses this exact same flow) — if adsUnlocked is on, skip
+  // straight to the reward; otherwise play the platform's rewarded ad and
+  // only pay out if the player actually watched it through. The game loop
+  // is paused and our own SFX are silenced for the duration of the actual
+  // ad playback (not while adsUnlocked skips it — there's nothing to pause
+  // for then).
   const watchAd = useCallback(async () => {
     const popup = stateRef.current.adPopup;
     if (!popup) return;
