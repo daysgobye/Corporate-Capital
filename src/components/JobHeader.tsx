@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { GameState } from '../game/types';
 import MuteButton from './MuteButton';
+import VisualsButton from './VisualsButton';
 
 interface Props {
   state: GameState;
@@ -64,7 +65,10 @@ export default function JobHeader({ state, title, onClearMoneyFloater }: Props) 
           </span>
         </h1>
       </div>
-      <MuteButton />
+      <div className="header-controls">
+        <MuteButton />
+        <VisualsButton />
+      </div>
       <div className="funds-display">
         <span className="job-title-eyebrow">{state.currencyLabel}</span>
         <div className="funds-amount">${state.funds.toLocaleString('en-US')}</div>

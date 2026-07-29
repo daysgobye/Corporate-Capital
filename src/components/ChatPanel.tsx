@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GameState } from '../game/types';
 import { CANNED_LABELS } from '../game/content';
 import VirtualKeyboard from './Virtualkeyboard';
+import { isVisualsMuted, subscribeVisualsMuted } from '../lib/visuals';
 
 interface Props {
   state: GameState;
@@ -16,6 +17,9 @@ export default function ChatPanel({ state, onKeypress, onSend, onCanned }: Props
   const ready = ticket ? state.manualProgress >= ticket.requiredChars : false;
   const cannedUnlocked = state.milestonesUnlocked.cannedResponses || state.milestonesUnlocked.briefingTemplates;
   const cannedReady = cannedUnlocked && state.cannedCooldownMs <= 0;
+
+  const [visualsMuted, setVisualsMuted] = useState(isVisualsMuted());
+  useEffect(() => subscribeVisualsMuted(setVisualsMuted), []);
 
   // Typing works anywhere on the page — no need to click into a box first.
   // It only does anything if there's a ticket open to apply it to.
@@ -50,7 +54,7 @@ export default function ChatPanel({ state, onKeypress, onSend, onCanned }: Props
       <div className="panel-heading">
         <h2>Incoming Tickets</h2>
         <div className="queue-badge-wrap">
-          {state.arrivalPulse > 0 && (
+          {!visualsMuted && state.arrivalPulse > 0 && (
             <span key={state.arrivalPulse} className="arrival-ping" aria-hidden="true">✉️</span>
           )}
           <span className={`queue-badge ${state.shake ? 'queue-badge-hot' : ''}`}>

@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GameState } from '../game/types';
+import { isVisualsMuted, subscribeVisualsMuted } from '../lib/visuals';
 
 interface Props {
   state: GameState;
@@ -10,6 +11,12 @@ interface Props {
 const CONFETTI_COLORS = ['--accent', '--toner-red', '--synergy-green', '--highlight-yellow'];
 
 export default function EffectsLayer({ state, onClearParticle, onClearFloater }: Props) {
+  const [visualsMuted, setVisualsMuted] = useState(isVisualsMuted());
+  useEffect(() => subscribeVisualsMuted(setVisualsMuted), []);
+
+  // These clear-out effects stay active even while visuals are muted, so the
+  // underlying arrays don't quietly grow forever — they just never get
+  // rendered below.
   useEffect(() => {
     const timers = state.particles.map((p) => window.setTimeout(() => onClearParticle(p.id), 1100));
     return () => timers.forEach((t) => window.clearTimeout(t));
@@ -21,7 +28,7 @@ export default function EffectsLayer({ state, onClearParticle, onClearFloater }:
   }, [state.floaters, onClearFloater]);
 
   const confettiPieces = useMemo(() => {
-    if (state.confettiBurst === 'none') return [];
+    if (visualsMuted || state.confettiBurst === 'none') return [];
     const count = state.confettiBurst === 'big' ? 36 : 16;
     return Array.from({ length: count }, (_, i) => ({
       id: i,
@@ -31,7 +38,13 @@ export default function EffectsLayer({ state, onClearParticle, onClearFloater }:
       color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
       rotate: Math.random() * 360,
     }));
-  }, [state.confettiBurst]);
+  }, [state.confettiBurst, visualsMuted]);
+
+  // Visual effects toggled off — skip rendering the particles/floaters/
+  // confetti/stamp entirely. This is the main perf win: no DOM nodes, no
+  // CSS animations running, regardless of how much automation is spawning
+  // "pop" events under the hood.
+  if (visualsMuted) return null;
 
   return (
     <div className="effects-layer" aria-hidden="true">

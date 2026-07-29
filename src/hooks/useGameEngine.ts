@@ -28,7 +28,9 @@ import {
   AFK_PAYOUT_FACTOR,
   buildAfkSummary,
 } from '../game/content';
-import { audio, setAdMuted } from '../lib/audio';
+import { adsEffectivelyUnlocked } from '../game/config';
+import { audio, setAdMuted, initMuted } from '../lib/audio';
+import { initVisualsMuted } from '../lib/visuals';
 import { platform } from '../lib/platform';
 import { loadSaveData, saveGame, extractSaveData } from '../lib/storage';
 
@@ -85,6 +87,8 @@ function initialState(): GameState {
     closedThisSecond: 0,
     ticketsPerSec: 0,
     secondAccumMs: 0,
+    incomeRatePerMin: 0,
+    secondFundsSnapshot: 0,
     particles: [],
     floaters: [],
     shake: false,
@@ -364,8 +368,13 @@ function applyAction(state: GameState, action: Action): GameState {
     case 'CLEAR_MONEY_FLOATER':
       return { ...state, moneyFloaters: state.moneyFloaters.filter((f) => f.id !== action.id) };
 
-    case 'HYDRATE':
-      return { ...state, ...action.data };
+    case 'HYDRATE': {
+      const hydrated = { ...state, ...action.data };
+      // Anchor the income-rate tracker to the just-loaded/AFK-simulated funds
+      // total so the very first per-second tick after a load doesn't read the
+      // entire loaded balance as "income earned in the last second".
+      return { ...hydrated, secondFundsSnapshot: hydrated.funds };
+    }
 
     case 'CLEAR_CONFETTI':
       return { ...state, confettiBurst: 'none' };
@@ -563,15 +572,23 @@ function applyAction(state: GameState, action: Action): GameState {
         }
       }
 
-      // Rate display + shake threshold, once per second
+      // Rate display + shake threshold + income/min tracking, once per second.
       const secondAccum = next.secondAccumMs + delta;
       if (secondAccum >= 1000) {
+        const fundsDeltaThisSecond = next.funds - next.secondFundsSnapshot;
+        const instantRatePerMin = fundsDeltaThisSecond * 60;
+        // Light smoothing (EMA) so the displayed number doesn't jitter wildly
+        // every single second — it settles toward the true rate over a few
+        // seconds instead of snapping to each second's raw reading.
+        const smoothedRatePerMin = next.incomeRatePerMin * 0.7 + instantRatePerMin * 0.3;
         next = {
           ...next,
           secondAccumMs: secondAccum - 1000,
           ticketsPerSec: next.closedThisSecond,
           closedThisSecond: 0,
           shake: next.queue.length / MAX_QUEUE > 0.8,
+          incomeRatePerMin: smoothedRatePerMin,
+          secondFundsSnapshot: next.funds,
         };
       } else {
         next = { ...next, secondAccumMs: secondAccum };
@@ -589,7 +606,7 @@ function applyAction(state: GameState, action: Action): GameState {
             adPopup: {
               id: next.adPopup ? next.adPopup.id + 1 : 1,
               rewardAmount: computeAdReward(next.maxFundsEver),
-              ...pickAdFlavor(next.adsUnlocked),
+              ...pickAdFlavor(adsEffectivelyUnlocked(next.adsUnlocked)),
             },
             adTimerMs: randomAdDelayMs(),
           };
@@ -742,6 +759,10 @@ export function useGameEngine() {
       } catch (e) {
         console.error('[Game] platform init failed, continuing without it', e);
       }
+      // Hydrate persisted mute preferences (audio + visual effects) now that
+      // the platform storage bridge is up.
+      initMuted().catch(() => { });
+      initVisualsMuted().catch(() => { });
       platform.gameReady();
       const save = await loadSaveData();
       if (cancelled) return;
@@ -910,17 +931,19 @@ export function useGameEngine() {
   const clearAfkSummary = useCallback(() => dispatch({ type: 'CLEAR_AFK_SUMMARY' }), []);
 
   // "Insider Trading Opportunity" popup (and the starter "Welcome Bonus"
-  // popup, which reuses this exact same flow) — if adsUnlocked is on, skip
-  // straight to the reward; otherwise play the platform's rewarded ad and
-  // only pay out if the player actually watched it through. The game loop
-  // is paused and our own SFX are silenced for the duration of the actual
-  // ad playback (not while adsUnlocked skips it — there's nothing to pause
-  // for then).
+  // popup, which reuses this exact same flow) — if ads are effectively
+  // unlocked (either the player's `adsUnlocked` flag, or the build-time
+  // FORCE_ADS_UNLOCKED flag for platforms with no ad SDK — see
+  // game/config.ts), skip straight to the reward; otherwise play the
+  // platform's rewarded ad and only pay out if the player actually watched
+  // it through. The game loop is paused and our own SFX are silenced for
+  // the duration of the actual ad playback (not while ads are skipped —
+  // there's nothing to pause for then).
   const watchAd = useCallback(async () => {
     const popup = stateRef.current.adPopup;
     if (!popup) return;
 
-    if (stateRef.current.adsUnlocked) {
+    if (adsEffectivelyUnlocked(stateRef.current.adsUnlocked)) {
       audio.win();
       dispatch({ type: 'CLAIM_AD_REWARD' });
       return;
@@ -944,10 +967,17 @@ export function useGameEngine() {
 
   // AFK "welcome back" summary — lets the player watch a rewarded ad to
   // double the (already-nerfed) earnings shown on the popup. Same
-  // pause/mute treatment as watchAd above while the ad is actually playing.
+  // ads-effectively-unlocked short-circuit and pause/mute treatment as
+  // watchAd above while a real ad is actually playing.
   const claimAfkBonus = useCallback(async () => {
     const summary = stateRef.current.afkSummary;
     if (!summary || summary.bonusClaimed || summary.fundsGained <= 0) return;
+
+    if (adsEffectivelyUnlocked(stateRef.current.adsUnlocked)) {
+      audio.win();
+      dispatch({ type: 'CLAIM_AFK_BONUS' });
+      return;
+    }
 
     pausedRef.current = true;
     setAdMuted(true);

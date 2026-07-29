@@ -1,4 +1,5 @@
 import type { GameState } from '../game/types';
+import { adsEffectivelyUnlocked } from '../game/config';
 
 interface Props {
   state: GameState;
@@ -27,7 +28,7 @@ export default function AdPopup({ state, onWatch }: Props) {
           <p className="ad-postit-copy">{popup.copy}</p>
           <div className="ad-postit-reward">+${popup.rewardAmount.toLocaleString('en-US')}</div>
           <button type="button" className="ad-postit-btn" onClick={onWatch}>
-            {state.adsUnlocked ? 'COLLECT' : '▶ WATCH AD'}
+            {adsEffectivelyUnlocked(state.adsUnlocked) ? 'COLLECT' : '▶ WATCH AD'}
           </button>
         </div>
       </div>

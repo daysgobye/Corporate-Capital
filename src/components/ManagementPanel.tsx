@@ -4,6 +4,16 @@ interface Props {
   state: GameState;
 }
 
+function formatRatePerMin(amount: number): string {
+  const sign = amount >= 0 ? '+' : '-';
+  const abs = Math.round(Math.abs(amount));
+  const formatted =
+    abs >= 1000
+      ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(abs)
+      : abs.toLocaleString('en-US');
+  return `${sign}$${formatted}/min`;
+}
+
 export default function ManagementPanel({ state }: Props) {
   return (
     <section className="panel management-panel" aria-label="Management dashboard">
@@ -12,6 +22,14 @@ export default function ManagementPanel({ state }: Props) {
       </div>
 
       <div className="stat-grid">
+        <div className="stat-card stat-card-wide">
+          <span className="stat-label">Income / Min</span>
+          <span
+            className={`stat-value ${state.incomeRatePerMin >= 0 ? 'stat-value-positive' : 'stat-value-negative'}`}
+          >
+            {formatRatePerMin(state.incomeRatePerMin)}
+          </span>
+        </div>
         <div className="stat-card">
           <span className="stat-label">Active Load</span>
           <span className="stat-value">{state.queue.length + (state.activeTicket ? 1 : 0)}/40</span>

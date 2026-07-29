@@ -131,6 +131,15 @@ body {
   padding-right: 2px;
 }
 
+/* Wraps MuteButton + VisualsButton so they sit together as one group between
+   the scrolling title and the funds display, and never shrink/wrap. */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .mute-btn {
   flex-shrink: 0;
   width: 38px;
@@ -168,7 +177,12 @@ body {
   color: var(--highlight-yellow);
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
 }
-
+.visuals-mute-btn{
+display:relative;
+}
+.x-overlay{
+  position:absolute;
+}
 /* ---------- Layout ---------- */
 .panels-grid {
   flex: 1;
@@ -453,6 +467,12 @@ body {
   box-shadow: 3px 3px 0 var(--border);
 }
 
+/* Spans both columns of .stat-grid — used for the Income/Min stat so it
+   reads as the headline number rather than competing evenly with the rest. */
+.stat-card-wide {
+  grid-column: 1 / -1;
+}
+
 .stat-label {
   font-size: 10.5px;
   text-transform: uppercase;
@@ -464,6 +484,14 @@ body {
 .stat-value {
   font-family: var(--display);
   font-size: 19px;
+}
+
+.stat-value-positive {
+  color: var(--synergy-green);
+}
+
+.stat-value-negative {
+  color: var(--toner-red);
 }
 
 .ops-list h3 {
@@ -935,6 +963,10 @@ body {
   .job-title-eyebrow {
     font-size: 9.5px;
     margin-bottom: 2px;
+  }
+
+  .header-controls {
+    gap: 6px;
   }
 
   .mute-btn {

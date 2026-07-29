@@ -132,6 +132,10 @@ export interface GameState {
   closedThisSecond: number;
   ticketsPerSec: number;
   secondAccumMs: number;
+  /** Smoothed net funds change per minute (income minus spending) — basis for the Income/Min stat. */
+  incomeRatePerMin: number;
+  /** Internal: funds value at the start of the current 1-second window, used to compute incomeRatePerMin. */
+  secondFundsSnapshot: number;
 
   particles: FloatingParticle[];
   floaters: IncomeFloater[];
@@ -155,7 +159,9 @@ export interface GameState {
   /**
    * Dev/config toggle: when true, the popup still appears on its normal
    * schedule but tapping it instantly grants the reward instead of playing
-   * a rewarded ad first.
+   * a rewarded ad first. NOTE: also see FORCE_ADS_UNLOCKED in game/config.ts —
+   * that build-time flag overrides this for platforms with no ad SDK (e.g.
+   * itch.io) regardless of what's stored here.
    */
   adsUnlocked: boolean;
 }

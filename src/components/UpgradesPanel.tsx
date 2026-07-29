@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameState } from '../game/types';
 import { UPGRADES, MILESTONES, scaledUpgradeCost, scaledMilestoneCost } from '../game/content';
+import { isVisualsMuted, subscribeVisualsMuted } from '../lib/visuals';
 
 interface Props {
   state: GameState;
@@ -10,6 +11,8 @@ interface Props {
 
 export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [visualsMuted, setVisualsMuted] = useState(isVisualsMuted());
+  useEffect(() => subscribeVisualsMuted(setVisualsMuted), []);
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -31,7 +34,7 @@ export default function UpgradesPanel({ state, onBuyUpgrade, onBuyMilestone }: P
     <section className="panel upgrades-panel" aria-label="Upgrades and milestones">
       <div className="panel-heading">
         <h2>Upgrades &amp; Milestones</h2>
-        {state.upgradeFlashId > 0 && (
+        {!visualsMuted && state.upgradeFlashId > 0 && (
           <span key={state.upgradeFlashId} className="upgrade-flash-toast">
             ⚡ {state.upgradeFlashLabel}!
           </span>
