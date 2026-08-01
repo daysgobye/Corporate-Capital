@@ -600,8 +600,7 @@ display:relative;
   font-weight: 700;
 }
 
-.buy-btn,
-.milestone-btn {
+.buy-btn {
   font-family: var(--mono);
   font-weight: 700;
   font-size: 12px;
@@ -615,6 +614,31 @@ display:relative;
   transition: transform 0.08s, box-shadow 0.08s;
 }
 
+.milestone-btn {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.25;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 2.5px solid var(--border);
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--border);
+  transition: transform 0.08s, box-shadow 0.08s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  background: var(--accent);
+  color: var(--panel);
+  border-color: var(--border);
+  min-width: 150px;
+  max-width: 190px;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
+  animation: milestone-glow 1.6s ease-in-out infinite;
+}
 .buy-btn:hover:not(:disabled),
 .milestone-btn:hover:not(:disabled) {
   transform: translate(-1px, -1px);
@@ -1514,4 +1538,163 @@ display:relative;
   border: 3px solid var(--border);
   border-radius: 12px;
   text-align: center;
+}
+/* ---------- Onboarding tutorial ---------- */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.onboarding-spotlight {
+  position: fixed;
+  border-radius: 14px;
+  border: 3px solid var(--highlight-yellow);
+  box-shadow: 0 0 0 9999px rgba(33, 26, 18, 0.72);
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+  pointer-events: none;
+}
+
+.onboarding-card {
+  position: fixed;
+  pointer-events: auto;
+  background: var(--panel);
+  border: 3px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  padding: 18px 18px 16px;
+  transition: top 0.25s ease, left 0.25s ease;
+  animation: afk-card-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.onboarding-step-count {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.onboarding-card-title {
+  font-family: var(--display);
+  font-size: 15px;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+
+.onboarding-card-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.onboarding-skip-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 6px 4px;
+}
+
+.onboarding-next-btn {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--panel);
+  background: var(--toner-red);
+  border: 2.5px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--border);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.onboarding-next-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--border);
+}
+
+.onboarding-next-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--border);
+}
+
+.onboarding-overlay-final {
+  pointer-events: auto;
+  background: rgba(33, 26, 18, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.onboarding-final-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 3px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  padding: 28px 24px 24px;
+  text-align: center;
+  animation: afk-card-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.onboarding-eyebrow {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.onboarding-final-title {
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.35;
+  margin: 0 0 22px;
+  color: var(--ink);
+}
+
+.onboarding-final-btn {
+  width: 100%;
+  padding: 15px;
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 0.8px;
+  color: var(--panel);
+  background: var(--toner-red);
+  border: 3px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  animation: send-btn-beckon 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-card,
+  .onboarding-final-card,
+  .onboarding-final-btn,
+  .onboarding-spotlight {
+    animation: none !important;
+    transition: none !important;
+  }
 }

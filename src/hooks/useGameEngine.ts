@@ -965,6 +965,15 @@ export function useGameEngine() {
     }
   }, []);
 
+  // Exposed so callers (e.g. the onboarding tutorial) can pause the tick
+  // loop for reasons other than ad playback. Uses the same pausedRef gate
+  // as watchAd/claimAfkBonus, so it's safe if both happen to overlap —
+  // just make sure whichever call turns it on is also responsible for
+  // turning it back off.
+  const setEnginePaused = useCallback((paused: boolean) => {
+    pausedRef.current = paused;
+  }, []);
+
   // AFK "welcome back" summary — lets the player watch a rewarded ad to
   // double the (already-nerfed) earnings shown on the popup. Same
   // ads-effectively-unlocked short-circuit and pause/mute treatment as
@@ -1025,5 +1034,6 @@ export function useGameEngine() {
     hasStarted,
     start,
     cheatAddFunds,
+    setEnginePaused
   };
 }

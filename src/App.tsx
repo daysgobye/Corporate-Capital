@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+
+import Onboarding from './components/Onboarding';
+import { isOnboardingSeen, markOnboardingSeen } from './lib/onboarding';
 import { useGameEngine } from './hooks/useGameEngine';
 import JobHeader from './components/JobHeader';
 import ChatPanel from './components/ChatPanel';
@@ -20,7 +23,12 @@ function App() {
     claimAfkBonus, phaseTransitioning,
     saveChecked, hasSave, hasStarted, start,
     cheatAddFunds,
+    setEnginePaused
   } = useGameEngine();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const onboardingSeenRef = useRef(false);
+
+
   const [mobileTab, setMobileTab] = useState<MobileTab>('queue');
 
   const [cashShake, setCashShake] = useState(false);
@@ -33,6 +41,25 @@ function App() {
       return () => window.clearTimeout(t);
     }
   }, [state.moneyShakeId]);
+  useEffect(() => {
+    isOnboardingSeen().then((seen) => { onboardingSeenRef.current = seen; });
+  }, []);
+  useEffect(() => {
+    setEnginePaused(showOnboarding);
+  }, [showOnboarding, setEnginePaused]);
+  const handleStart = () => {
+    start();
+    if (!hasSave && !onboardingSeenRef.current) {
+      setShowOnboarding(true);
+    }
+  };
+
+  const handleOnboardingFinish = () => {
+    setShowOnboarding(false);
+    onboardingSeenRef.current = true;
+    markOnboardingSeen();
+  };
+
 
   if (!hasStarted) {
     return (
@@ -49,7 +76,7 @@ function App() {
             }
             : null
         }
-        onStart={start}
+        onStart={handleStart}
       />
     );
   }
@@ -65,7 +92,11 @@ function App() {
       </main>
 
       <MobileTabBar active={mobileTab} onChange={setMobileTab} />
-
+      <Onboarding
+        active={showOnboarding}
+        onSetMobileTab={setMobileTab}
+        onFinish={handleOnboardingFinish}
+      />
       <EffectsLayer state={state} onClearParticle={clearParticle} onClearFloater={clearFloater} />
 
       <AdPopup state={state} onWatch={watchAd} />
