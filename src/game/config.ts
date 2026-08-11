@@ -18,7 +18,7 @@
  * is granted instantly with no ad and buttons say "COLLECT" instead of
  * "WATCH AD".
  */
-export const FORCE_ADS_UNLOCKED = true;
+export const FORCE_ADS_UNLOCKED = false;
 
 /** Use this instead of reading `state.adsUnlocked` directly anywhere ad-gating matters. */
 export function adsEffectivelyUnlocked(adsUnlocked: boolean): boolean {
