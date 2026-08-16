@@ -903,17 +903,17 @@ export function useGameEngine() {
   const buyMilestone = useCallback((id: string) => {
     const isPhaseTransition = id === 'acceptPromotion' || id === 'executiveReset';
 
+    // Any milestone purchase is a natural pause point — not just prestige resets.
+    setAdMuted(true);
+    pausedRef.current = true;
+    platform.showInterstitial(id).finally(() => {
+      setAdMuted(false);
+      pausedRef.current = false;
+    });
+
     if (isPhaseTransition) {
-      // Disguise the mandatory interstitial ad as a "processing your
-      // promotion" loading screen. The minimum delay keeps the transition
-      // from flashing instantly when there's no real ad bridge (local dev).
-      // Same ad-mute treatment as the rewarded ads — silence our own SFX
-      // for the duration so nothing plays over/under the interstitial —
-      // restored in .finally() regardless of how showInterstitial resolves.
       setPhaseTransitioning(true);
-      setAdMuted(true);
-      Promise.allSettled([platform.showInterstitial(id), delay(1500)]).finally(() => {
-        setAdMuted(false);
+      Promise.allSettled([delay(1500)]).finally(() => {
         audio.win();
         dispatch({ type: 'BUY_MILESTONE', id });
         setPhaseTransitioning(false);

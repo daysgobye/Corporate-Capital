@@ -1,7 +1,8 @@
 // src/components/VisualsButton.tsx
 import { useEffect, useState } from 'react';
 import { isVisualsMuted, toggleVisualsMuted, subscribeVisualsMuted } from '../lib/visuals';
-
+import flash from "../assets/icons8-flash-on-48.png"
+import flashOff from "../assets/icons8-flash-off-48.png"
 export default function VisualsButton() {
   const [muted, setMuted] = useState(isVisualsMuted());
 
@@ -18,13 +19,14 @@ export default function VisualsButton() {
       aria-pressed={muted}
       title={muted ? 'Visual effects: off' : 'Visual effects: on'}
     >
-      {muted ? (<>
-        <span className='x-overlay'>
-          🚫
-        </span>
-        ✨
-      </>
-      ) : '✨'}
+
+      <img
+        src={muted ? flashOff : flash}
+        alt={muted ? 'Effects Off' : 'Effects enabled'}
+        width={24}
+        height={24}
+      />
+
     </button>
   );
 }

@@ -1,7 +1,8 @@
 // src/components/MuteButton.tsx
 import { useEffect, useState } from 'react';
 import { isMuted, toggleMute, subscribeMuted } from '../lib/audio';
-
+import mute from "../assets/icons8-mute-48.png"
+import audio from "../assets/icons8-audio-48.png"
 export default function MuteButton() {
   const [muted, setMuted] = useState(isMuted());
 
@@ -17,7 +18,12 @@ export default function MuteButton() {
       aria-label={muted ? 'Unmute sound' : 'Mute sound'}
       aria-pressed={muted}
     >
-      {muted ? '🔇' : '🔊'}
+      <img
+        src={muted ? mute : audio}
+        alt={muted ? 'Muted' : 'Audio enabled'}
+        width={24}
+        height={24}
+      />
     </button>
   );
 }
