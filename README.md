@@ -15,3 +15,12 @@ Mobile Controls:
 On-Screen Keyboard: Tap any key to draft your reply.
 Tap: Send button, canned response buttons, upgrade/milestone purchases.
 Tab Bar: Switch between Queue, Dashboard, and Upgrades panels.
+
+Filename Cue Where it fires Suggested feel Length
+
+lose.mp3 audio.lose() Reserved for setback/negative event Descending sad trombone-ish tone ~0.8–1.2s
+win.mp3 audio.win() Milestone purchased, big ad reward Triumphant fanfare/jingle ~1–1.5s
+clutch.mp3 audio.clutch() Upgrade purchased Satisfying "cha-ching"/purchase confirm ~0.3–0.5s
+correct.mp3 audio.correct() Reply sent successfully, ad reward claimed Bright positive "ding"/chime ~0.5–0.8s
+select.mp3 audio.select() Canned-response button used Snappy UI select/confirm blip ~0.2–0.3s
+countdown.mp3 audio.countdown() Reserved for timer/urgency cue Sharp tick/beep ~0.15–0.25s

@@ -1,7 +1,88 @@
 // src/lib/audio.ts
 import { platform } from './platform'
+function getRandomInt(min: number, max: number) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+export type SoundName =
+  | 'correct'
+  | 'wrong'
+  | 'tick'
+  | 'win'
+  | 'lose'
+  | 'click'
+  | 'click1'
+  | 'click2'
+  | 'click3'
+  | 'select'
+  | 'countdown'
+  | 'clutch' |
+  'clap'
+
+/**
+ * Where each cue's audio file lives. These are served straight out of
+ * /public, so drop your files at public/sounds/<name>.<ext> using these
+ * exact base names. mp3/ogg/wav all work — just update the extension here
+ * if you don't use mp3.
+ */
+const SOUND_FILES: Record<SoundName, string> = {
+  correct: '/sounds/correct.wav',
+  wrong: '/sounds/wrong.mp3',
+  tick: '/sounds/tick.mp3',
+  win: '/sounds/win.wav',
+  lose: '/sounds/lose.wav',
+  click: '/sounds/click-1.mp3',
+  click1: '/sounds/click-2.mp3',
+  click2: '/sounds/click-3.mp3',
+  click3: '/sounds/click-4.mp3',
+  select: '/sounds/select.mp3',
+  countdown: '/sounds/countdown.mp3',
+  clutch: '/sounds/clutch.mp3',
+  clap: '/sounds/clap.ogg',
+}
 
 let audioCtx: AudioContext | null = null
+function getCtx(): AudioContext {
+  if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+  return audioCtx
+}
+
+// Decoded-buffer cache, keyed by sound name. Value is a promise so
+// concurrent calls to the same sound share one fetch+decode instead of
+// racing.  A resolved `null` means "file missing/unplayable" and we just
+// silently no-op from then on — same fail-quiet style as the rest of this file.
+const bufferCache = new Map<SoundName, Promise<AudioBuffer | null>>()
+
+function loadBuffer(name: SoundName): Promise<AudioBuffer | null> {
+  const cached = bufferCache.get(name)
+  if (cached) return cached
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(SOUND_FILES[name])
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const arrayBuffer = await res.arrayBuffer()
+      return await getCtx().decodeAudioData(arrayBuffer)
+    } catch (e) {
+      console.warn(
+        `[Audio] couldn't load "${name}" from ${SOUND_FILES[name]} — drop a file there to enable this cue.`,
+        e,
+      )
+      return null
+    }
+  })()
+
+  bufferCache.set(name, promise)
+  return promise
+}
+
+/** Kicks off decoding for every cue up front (call once on boot) so the first play of each isn't delayed by a fetch. Safe to call more than once. */
+export function preloadSounds(): void {
+  ; (Object.keys(SOUND_FILES) as SoundName[]).forEach((name) => {
+    loadBuffer(name)
+  })
+}
 
 const MUTE_KEY = 'hct_muted'
 
@@ -40,6 +121,7 @@ export function subscribeMuted(listener: (muted: boolean) => void): () => void {
 
 /** Call once on boot (alongside platform.init()) to hydrate the mute flag from platform storage. */
 export async function initMuted(): Promise<void> {
+  preloadSounds()
   if (mutedInitialized) return
   mutedInitialized = true
   try {
@@ -65,69 +147,56 @@ export function toggleMute(): boolean {
   return muted
 }
 
-
-function getCtx(): AudioContext {
-  if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-  return audioCtx
-}
-
-function playTone(freq: number, type: OscillatorType, duration: number, gain = 0.3, delay = 0) {
+function playSound(name: SoundName, opts: { gain?: number; rate?: number } = {}) {
   if (muted || adMuted) return
-  try {
-    const ac = getCtx()
-    const osc = ac.createOscillator()
-    const g = ac.createGain()
-    osc.connect(g)
-    g.connect(ac.destination)
-    osc.type = type
-    osc.frequency.value = freq
-    const t = ac.currentTime + delay
-    g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(gain, t + 0.01)
-    g.gain.exponentialRampToValueAtTime(0.001, t + duration)
-    osc.start(t)
-    osc.stop(t + duration + 0.05)
-  } catch (_) { }
+  const { gain = 1, rate = 1 } = opts
+  loadBuffer(name).then((buffer) => {
+    if (!buffer) return
+    if (muted || adMuted) return // re-check — mute may have toggled while this was loading
+    try {
+      const ctx = getCtx()
+      const source = ctx.createBufferSource()
+      const g = ctx.createGain()
+      source.buffer = buffer
+      source.playbackRate.value = rate
+      g.gain.value = gain
+      source.connect(g)
+      g.connect(ctx.destination)
+      source.start()
+    } catch (_) { }
+  })
 }
 
 export const audio = {
   correct() {
-    playTone(523, 'sine', 0.12, 0.3)
-    playTone(659, 'sine', 0.12, 0.3, 0.1)
-    playTone(784, 'sine', 0.2, 0.35, 0.2)
-    playTone(1047, 'sine', 0.3, 0.4, 0.35)
+    playSound('correct')
   },
   wrong() {
-    playTone(200, 'sawtooth', 0.15, 0.4)
-    playTone(150, 'sawtooth', 0.25, 0.45, 0.15)
-    playTone(100, 'sawtooth', 0.3, 0.5, 0.35)
+    playSound('wrong')
   },
   tick(urgency = 0) {
-    playTone(440 + urgency * 60, 'square', 0.08, 0.15 + urgency * 0.1)
+    // urgency (0–1ish) nudges pitch/volume up instead of picking a different oscillator freq
+    playSound('tick', { rate: 1 + urgency * 0.15, gain: 0.6 + urgency * 0.4 })
   },
   win() {
-    ;[523, 659, 784, 1047, 1319, 1568].forEach((f, i) =>
-      playTone(f, 'sine', 0.3, 0.35, i * 0.1)
-    )
+    playSound('win')
+    playSound('clap')
   },
   lose() {
-    ;[300, 250, 200, 150].forEach((f, i) =>
-      playTone(f, 'sawtooth', 0.4, 0.5, i * 0.18)
-    )
+    playSound('lose')
   },
   click() {
-    playTone(800, 'sine', 0.05, 0.1)
+    //@ts-ignore
+    const randomSound: SoundName = ["click", "click1", "click2", "click3"][getRandomInt(0, 3)]
+    playSound(randomSound,)
   },
   select() {
-    playTone(600, 'sine', 0.06, 0.15)
-    playTone(900, 'sine', 0.06, 0.15, 0.06)
+    playSound('select')
   },
   countdown() {
-    playTone(880, 'square', 0.15, 0.5)
+    playSound('countdown')
   },
   clutch() {
-    playTone(1200, 'square', 0.08, 0.4)
-    playTone(1600, 'square', 0.1, 0.45, 0.08)
-    playTone(2000, 'sine', 0.25, 0.5, 0.16)
+    playSound('clutch')
   },
 }
