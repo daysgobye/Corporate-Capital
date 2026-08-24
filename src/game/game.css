@@ -526,7 +526,12 @@ display:relative;
 
 .upgrades-panel .panel-heading{
   position: sticky;
-  top: 0;
+  top: -18px;
+  margin: -18px -18px 14px;
+  padding: 18px 18px 10px;
+  background: var(--panel);
+  z-index: 1;
+  border-radius: 16px 16px 0 0;
 }
 
 .upgrade-list,

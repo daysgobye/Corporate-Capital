@@ -25,21 +25,30 @@ export type SoundName =
  * /public, so drop your files at public/sounds/<name>.<ext> using these
  * exact base names. mp3/ogg/wav all work — just update the extension here
  * if you don't use mp3.
+ *
+ * IMPORTANT: these must stay relative (no leading "/"). The build is hosted
+ * from a nested path on Playgama (see `base: './'` in vite.config.ts), not
+ * from the domain root — a root-absolute path like "/sounds/x.wav" resolves
+ * against the wrong origin once deployed there and silently fails to load
+ * (loadBuffer catches the fetch error and just returns null, so it looks
+ * like "no sound plays" rather than an obvious error). A relative path
+ * resolves against wherever index.html actually is, which is what we want
+ * both locally and on Playgama.
  */
 const SOUND_FILES: Record<SoundName, string> = {
-  correct: '/sounds/correct.wav',
-  wrong: '/sounds/wrong.mp3',
-  tick: '/sounds/tick.mp3',
-  win: '/sounds/win.wav',
-  lose: '/sounds/lose.wav',
-  click: '/sounds/click-1.mp3',
-  click1: '/sounds/click-2.mp3',
-  click2: '/sounds/click-3.mp3',
-  click3: '/sounds/click-4.mp3',
-  select: '/sounds/select.mp3',
-  countdown: '/sounds/countdown.mp3',
-  clutch: '/sounds/clutch.mp3',
-  clap: '/sounds/clap.ogg',
+  correct: 'sounds/correct.wav',
+  wrong: 'sounds/wrong.mp3',
+  tick: 'sounds/tick.mp3',
+  win: 'sounds/win.wav',
+  lose: 'sounds/lose.wav',
+  click: 'sounds/click-1.mp3',
+  click1: 'sounds/click-2.mp3',
+  click2: 'sounds/click-3.mp3',
+  click3: 'sounds/click-4.mp3',
+  select: 'sounds/select.mp3',
+  countdown: 'sounds/countdown.mp3',
+  clutch: 'sounds/clutch.mp3',
+  clap: 'sounds/clap.ogg',
 }
 
 let audioCtx: AudioContext | null = null
@@ -47,6 +56,38 @@ function getCtx(): AudioContext {
   if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
   return audioCtx
 }
+
+function resumeCtx(): void {
+  const ctx = audioCtx
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => { })
+  }
+}
+
+/**
+ * Browsers refuse to let an AudioContext actually produce sound until it's
+ * resumed from inside a real user gesture — creating it early (which
+ * preloadSounds/initMuted does, on boot, before any click) leaves it stuck
+ * `suspended` forever. source.start() on a suspended context doesn't error,
+ * it just plays nothing, which is why this bug is silent instead of
+ * throwing. This listens for the player's first click/tap/keypress
+ * anywhere on the page and resumes the context right then, inside the
+ * gesture's call stack, which is what the browser's autoplay policy
+ * requires. Also see the defensive resumeCtx() call in playSound below,
+ * as a second line of defense.
+ */
+function attachAudioUnlock(): void {
+  if (typeof window === 'undefined') return
+  const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart']
+  function unlock() {
+    // getCtx() lazily creates the context if preloadSounds hasn't run yet —
+    // either way, resume() is now called from directly inside this gesture.
+    getCtx().resume().catch(() => { })
+    events.forEach((evt) => window.removeEventListener(evt, unlock))
+  }
+  events.forEach((evt) => window.addEventListener(evt, unlock, { passive: true }))
+}
+attachAudioUnlock()
 
 // Decoded-buffer cache, keyed by sound name. Value is a promise so
 // concurrent calls to the same sound share one fetch+decode instead of
@@ -150,11 +191,16 @@ export function toggleMute(): boolean {
 function playSound(name: SoundName, opts: { gain?: number; rate?: number } = {}) {
   if (muted || adMuted) return
   const { gain = 1, rate = 1 } = opts
+  // Fallback resume attempt — playSound is almost always itself called
+  // from inside a click/keydown handler, so this catches any case the
+  // global unlock listener above might have missed.
+  resumeCtx()
   loadBuffer(name).then((buffer) => {
     if (!buffer) return
     if (muted || adMuted) return // re-check — mute may have toggled while this was loading
     try {
       const ctx = getCtx()
+      resumeCtx()
       const source = ctx.createBufferSource()
       const g = ctx.createGain()
       source.buffer = buffer

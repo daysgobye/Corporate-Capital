@@ -899,21 +899,19 @@ export function useGameEngine() {
     audio.clutch();
     dispatch({ type: 'BUY_UPGRADE', id });
   }, []);
-
   const buyMilestone = useCallback((id: string) => {
     const isPhaseTransition = id === 'acceptPromotion' || id === 'executiveReset';
 
-    // Any milestone purchase is a natural pause point — not just prestige resets.
     setAdMuted(true);
     pausedRef.current = true;
-    platform.showInterstitial(id).finally(() => {
+    const interstitialDone = platform.showInterstitial(id).finally(() => {
       setAdMuted(false);
       pausedRef.current = false;
     });
 
     if (isPhaseTransition) {
       setPhaseTransitioning(true);
-      Promise.allSettled([delay(1500)]).finally(() => {
+      Promise.allSettled([delay(1500), interstitialDone]).finally(() => {
         audio.win();
         dispatch({ type: 'BUY_MILESTONE', id });
         setPhaseTransitioning(false);
@@ -921,24 +919,18 @@ export function useGameEngine() {
       return;
     }
 
-    audio.win();
+    interstitialDone.finally(() => {
+      audio.win();
+    });
     dispatch({ type: 'BUY_MILESTONE', id });
   }, []);
+
 
   const clearParticle = useCallback((id: number) => dispatch({ type: 'CLEAR_PARTICLE', id }), []);
   const clearFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_FLOATER', id }), []);
   const clearMoneyFloater = useCallback((id: number) => dispatch({ type: 'CLEAR_MONEY_FLOATER', id }), []);
   const clearAfkSummary = useCallback(() => dispatch({ type: 'CLEAR_AFK_SUMMARY' }), []);
 
-  // "Insider Trading Opportunity" popup (and the starter "Welcome Bonus"
-  // popup, which reuses this exact same flow) — if ads are effectively
-  // unlocked (either the player's `adsUnlocked` flag, or the build-time
-  // FORCE_ADS_UNLOCKED flag for platforms with no ad SDK — see
-  // game/config.ts), skip straight to the reward; otherwise play the
-  // platform's rewarded ad and only pay out if the player actually watched
-  // it through. The game loop is paused and our own SFX are silenced for
-  // the duration of the actual ad playback (not while ads are skipped —
-  // there's nothing to pause for then).
   const watchAd = useCallback(async () => {
     const popup = stateRef.current.adPopup;
     if (!popup) return;
@@ -951,20 +943,20 @@ export function useGameEngine() {
 
     pausedRef.current = true;
     setAdMuted(true);
+    let rewarded = false;
     try {
-      const rewarded = await platform.showRewarded('insider_trading_tip');
-      if (rewarded) {
-        audio.win();
-        dispatch({ type: 'CLAIM_AD_REWARD' });
-      }
+      rewarded = await platform.showRewarded('insider_trading_tip');
     } catch (e) {
       console.error('[Game] showRewarded failed', e);
     } finally {
       setAdMuted(false);
       pausedRef.current = false;
     }
+    if (rewarded) {
+      audio.win();
+      dispatch({ type: 'CLAIM_AD_REWARD' });
+    }
   }, []);
-
   // Exposed so callers (e.g. the onboarding tutorial) can pause the tick
   // loop for reasons other than ad playback. Uses the same pausedRef gate
   // as watchAd/claimAfkBonus, so it's safe if both happen to overlap —
@@ -973,11 +965,7 @@ export function useGameEngine() {
   const setEnginePaused = useCallback((paused: boolean) => {
     pausedRef.current = paused;
   }, []);
-
-  // AFK "welcome back" summary — lets the player watch a rewarded ad to
-  // double the (already-nerfed) earnings shown on the popup. Same
-  // ads-effectively-unlocked short-circuit and pause/mute treatment as
-  // watchAd above while a real ad is actually playing.
+  // claimAfkBonus
   const claimAfkBonus = useCallback(async () => {
     const summary = stateRef.current.afkSummary;
     if (!summary || summary.bonusClaimed || summary.fundsGained <= 0) return;
@@ -990,24 +978,20 @@ export function useGameEngine() {
 
     pausedRef.current = true;
     setAdMuted(true);
+    let rewarded = false;
     try {
-      const rewarded = await platform.showRewarded('afk_double_bonus');
-      if (rewarded) {
-        audio.win();
-        dispatch({ type: 'CLAIM_AFK_BONUS' });
-      }
+      rewarded = await platform.showRewarded('afk_double_bonus');
     } catch (e) {
       console.error('[Game] showRewarded (AFK bonus) failed', e);
     } finally {
       setAdMuted(false);
       pausedRef.current = false;
     }
+    if (rewarded) {
+      audio.win();
+      dispatch({ type: 'CLAIM_AFK_BONUS' });
+    }
   }, []);
-
-  // Dev-only testing cheat — not gated on hasStarted/paused on purpose, it's
-  // just a direct funds injection for manually testing upgrades/milestones
-  // without grinding. Wire this to a dev-only button (see App.tsx), not
-  // anything shipped to real players.
   const cheatAddFunds = useCallback((amount = 100_000) => {
     dispatch({ type: 'CHEAT_ADD_FUNDS', amount });
   }, []);

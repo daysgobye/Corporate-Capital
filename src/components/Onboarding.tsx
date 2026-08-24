@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { MobileTab } from './MobileTabBar';
 
 interface OnboardingStep {
@@ -54,6 +54,12 @@ const STEPS: OnboardingStep[] = [
   },
 ];
 
+// Fallback estimate used only for the very first paint, before we've
+// measured the real card. Real placement is corrected in the layout
+// effect below once the card's actual height is known.
+const ESTIMATED_CARD_HEIGHT = 190;
+const VIEWPORT_MARGIN = 16;
+
 function computeCardStyle(rect: DOMRect | null): CSSProperties {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -64,15 +70,20 @@ function computeCardStyle(rect: DOMRect | null): CSSProperties {
   }
 
   const spaceBelow = vh - rect.bottom;
-  const placeBelow = spaceBelow > 190 || rect.top < 190;
+  const spaceAbove = rect.top;
+  // Prefer whichever side actually has more room, instead of assuming
+  // "below" just because the target starts near the top of the screen —
+  // a tall target (like the whole management panel) can start near the
+  // top AND still leave no usable space below it.
+  const placeBelow = spaceBelow >= spaceAbove;
   const top = placeBelow
-    ? Math.min(rect.bottom + 18, vh - 210)
-    : Math.max(16, rect.top - 200);
+    ? Math.min(rect.bottom + 18, vh - ESTIMATED_CARD_HEIGHT - VIEWPORT_MARGIN)
+    : Math.max(VIEWPORT_MARGIN, rect.top - ESTIMATED_CARD_HEIGHT - 18);
 
   let left = rect.left + rect.width / 2 - width / 2;
-  left = Math.max(16, Math.min(left, vw - width - 16));
+  left = Math.max(VIEWPORT_MARGIN, Math.min(left, vw - width - VIEWPORT_MARGIN));
 
-  return { top, left, width };
+  return { top: Math.max(VIEWPORT_MARGIN, top), left, width };
 }
 
 interface Props {
@@ -85,9 +96,12 @@ export default function Onboarding({ active, onSetMobileTab, onFinish }: Props) 
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const rafRef = useRef<number | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   const isFinalStep = stepIndex >= STEPS.length;
   const step = STEPS[stepIndex];
+
+  const [cardStyle, setCardStyle] = useState<CSSProperties>(() => computeCardStyle(null));
 
   useEffect(() => {
     if (active) setStepIndex(0);
@@ -117,6 +131,36 @@ export default function Onboarding({ active, onSetMobileTab, onFinish }: Props) 
       window.removeEventListener('resize', measure);
     };
   }, [active, isFinalStep, step]);
+
+  // Initial placement, based on the estimated card height.
+  useEffect(() => {
+    if (!active || isFinalStep) return;
+    setCardStyle(computeCardStyle(rect));
+  }, [active, isFinalStep, rect]);
+
+  // Correction pass: once the card has actually rendered, measure its
+  // real height (title/body length varies per step) and clamp `top` so
+  // it can never run off the bottom (or top) of the viewport — this is
+  // what was missing before, causing the last step's taller copy to spill
+  // past the screen edge.
+  useLayoutEffect(() => {
+    if (!active || isFinalStep) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    const vh = window.innerHeight;
+    const height = el.getBoundingClientRect().height;
+    const currentTop = typeof cardStyle.top === 'number' ? cardStyle.top : parseFloat(String(cardStyle.top));
+    if (Number.isNaN(currentTop)) return;
+
+    const maxTop = Math.max(VIEWPORT_MARGIN, vh - height - VIEWPORT_MARGIN);
+    const clampedTop = Math.max(VIEWPORT_MARGIN, Math.min(currentTop, maxTop));
+
+    if (Math.abs(clampedTop - currentTop) > 0.5) {
+      setCardStyle((s) => ({ ...s, top: clampedTop }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, isFinalStep, step, cardStyle.top, cardStyle.left, cardStyle.width]);
 
   if (!active) return null;
 
@@ -149,7 +193,7 @@ export default function Onboarding({ active, onSetMobileTab, onFinish }: Props) 
           }}
         />
       )}
-      <div className="onboarding-card" style={computeCardStyle(rect)}>
+      <div className="onboarding-card" ref={cardRef} style={cardStyle}>
         <span className="onboarding-step-count">{stepIndex + 1} / {STEPS.length}</span>
         <h3 className="onboarding-card-title">{step.title}</h3>
         <p className="onboarding-card-body">{step.body}</p>
