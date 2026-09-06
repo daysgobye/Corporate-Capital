@@ -1703,3 +1703,8 @@ display:relative;
     transition: none !important;
   }
 }
+
+.game-paused,
+.game-paused * {
+  animation-play-state: paused !important;
+}

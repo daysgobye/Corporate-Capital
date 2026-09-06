@@ -1,10 +1,12 @@
 // src/lib/audio.ts
+//
 import { platform } from './platform'
 function getRandomInt(min: number, max: number) {
   min = Math.ceil(min);
   max = Math.floor(max);
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+let platformAudioEnabled = true
 export type SoundName =
   | 'correct'
   | 'wrong'
@@ -53,9 +55,14 @@ const SOUND_FILES: Record<SoundName, string> = {
 
 let audioCtx: AudioContext | null = null
 function getCtx(): AudioContext {
-  if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+  if (!audioCtx) {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext
+    if (!Ctor) throw new Error('Web Audio API unavailable on this device')
+    audioCtx = new Ctor()
+  }
   return audioCtx
 }
+
 
 function resumeCtx(): void {
   const ctx = audioCtx
@@ -80,15 +87,16 @@ function attachAudioUnlock(): void {
   if (typeof window === 'undefined') return
   const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart']
   function unlock() {
-    // getCtx() lazily creates the context if preloadSounds hasn't run yet —
-    // either way, resume() is now called from directly inside this gesture.
-    getCtx().resume().catch(() => { })
+    try {
+      getCtx().resume().catch(() => { })
+    } catch (e) {
+      console.warn('[Audio] AudioContext unavailable on this device — sound will stay disabled', e)
+    }
     events.forEach((evt) => window.removeEventListener(evt, unlock))
   }
   events.forEach((evt) => window.addEventListener(evt, unlock, { passive: true }))
 }
 attachAudioUnlock()
-
 // Decoded-buffer cache, keyed by sound name. Value is a promise so
 // concurrent calls to the same sound share one fetch+decode instead of
 // racing.  A resolved `null` means "file missing/unplayable" and we just
@@ -165,9 +173,21 @@ export async function initMuted(): Promise<void> {
   preloadSounds()
   if (mutedInitialized) return
   mutedInitialized = true
+
+  // Seed from the platform's CURRENT audio state, then keep it current via
+  // the subscription — per Playgama's docs, the event alone only fires on
+  // later changes, so the initial value has to be read explicitly.
+  try {
+    platformAudioEnabled = platform.isAudioEnabled
+  } catch {
+    platformAudioEnabled = true
+  }
+  platform.onAudioStateChanged((enabled) => {
+    platformAudioEnabled = enabled
+  })
+
   try {
     const stored = await platform.storageGet(MUTE_KEY)
-    // Defensive per IPlatform's note: some bridges hand back a non-string.
     if (stored === '1' || stored === '0') {
       muted = stored === '1'
       notifyMuted()
@@ -189,15 +209,14 @@ export function toggleMute(): boolean {
 }
 
 function playSound(name: SoundName, opts: { gain?: number; rate?: number } = {}) {
-  if (muted || adMuted) return
+  if (muted || adMuted || !platformAudioEnabled) return
   const { gain = 1, rate = 1 } = opts
-  // Fallback resume attempt — playSound is almost always itself called
-  // from inside a click/keydown handler, so this catches any case the
-  // global unlock listener above might have missed.
-  resumeCtx()
+  try {
+    resumeCtx()
+  } catch { }
   loadBuffer(name).then((buffer) => {
     if (!buffer) return
-    if (muted || adMuted) return // re-check — mute may have toggled while this was loading
+    if (muted || adMuted || !platformAudioEnabled) return // re-check — state may have changed while this was loading
     try {
       const ctx = getCtx()
       resumeCtx()
@@ -212,6 +231,7 @@ function playSound(name: SoundName, opts: { gain?: number; rate?: number } = {})
     } catch (_) { }
   })
 }
+
 
 export const audio = {
   correct() {

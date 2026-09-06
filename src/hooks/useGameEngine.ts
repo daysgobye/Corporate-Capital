@@ -698,16 +698,40 @@ export function useGameEngine() {
   const startedRef = useRef(false);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // ── Pause gate for rewarded ads ─────────────────────────────────────
-  // While a rewarded ad (Insider Trading popup, the starter Welcome Bonus
-  // popup, or the AFK "double your earnings" ad) is actually playing, we
-  // don't want tickets arriving, automation resolving, cooldowns ticking
-  // down, etc. behind it — the player would come back to a pile of state
-  // changes they never saw happen. `pausedRef` gates the TICK dispatch
-  // itself (see the interval effect below); `setAdMuted` separately
-  // silences our own SFX for the same window without touching the
-  // player's persisted mute preference.
+  // ── Pause gate (ads, onboarding, tab visibility) ────────────────────
+  // While an ad is playing, the onboarding tutorial is active, or the
+  // browser tab is hidden, we don't want tickets arriving, automation
+  // resolving, cooldowns ticking down, etc. behind the player's back.
+  // `pausedRef` gates the TICK dispatch itself (see the interval effect
+  // below). Multiple independent things can want the engine paused at
+  // once (e.g. an ad still playing when the tab also happens to be
+  // hidden), so instead of a single boolean written by whichever caller
+  // ran last, we track a *set* of reasons — the engine stays paused as
+  // long as the set is non-empty, and each caller only ever adds/removes
+  // its own reason. `isPaused` is the React-visible mirror of the same
+  // thing, used to drive a `game-paused` CSS class that freezes CSS
+  // keyframe animations (shake, particles, confetti, the marquee, the ad
+  // sticky-note wobble, etc.) — those run independently of the tick loop
+  // once triggered, so stopping TICK alone doesn't stop them visually.
   const pausedRef = useRef(false);
+  const pauseReasonsRef = useRef<Set<string>>(new Set());
+  const [isPaused, setIsPaused] = useState(false);
+
+  const syncPaused = useCallback(() => {
+    const shouldPause = pauseReasonsRef.current.size > 0;
+    pausedRef.current = shouldPause;
+    setIsPaused(shouldPause);
+  }, []);
+
+  const addPauseReason = useCallback((reason: string) => {
+    pauseReasonsRef.current.add(reason);
+    syncPaused();
+  }, [syncPaused]);
+
+  const removePauseReason = useCallback((reason: string) => {
+    pauseReasonsRef.current.delete(reason);
+    syncPaused();
+  }, [syncPaused]);
 
   // ── Disguised interstitial ("loading screen") on phase transitions ────
   // While true, App renders a full-screen "processing your promotion"
@@ -739,6 +763,20 @@ export function useGameEngine() {
     }, 100);
     return () => window.clearInterval(interval);
   }, []);
+
+  // Pause the tick loop (and, via the `game-paused` CSS class in App, all
+  // CSS animations) whenever the browser tab isn't visible — otherwise
+  // tickets keep arriving, automation keeps resolving, and funds keep
+  // changing while the player isn't even looking at the game.
+  useEffect(() => {
+    function handleVisibilityPause() {
+      if (document.visibilityState === 'hidden') addPauseReason('tabHidden');
+      else removePauseReason('tabHidden');
+    }
+    handleVisibilityPause();
+    document.addEventListener('visibilitychange', handleVisibilityPause);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityPause);
+  }, [addPauseReason, removePauseReason]);
 
   // Clean up the starter-ad timeout if the component unmounts before it fires.
   useEffect(() => {
@@ -903,10 +941,10 @@ export function useGameEngine() {
     const isPhaseTransition = id === 'acceptPromotion' || id === 'executiveReset';
 
     setAdMuted(true);
-    pausedRef.current = true;
+    addPauseReason('ad');
     const interstitialDone = platform.showInterstitial(id).finally(() => {
       setAdMuted(false);
-      pausedRef.current = false;
+      removePauseReason('ad');
     });
 
     if (isPhaseTransition) {
@@ -923,7 +961,7 @@ export function useGameEngine() {
       audio.win();
     });
     dispatch({ type: 'BUY_MILESTONE', id });
-  }, []);
+  }, [addPauseReason, removePauseReason]);
 
 
   const clearParticle = useCallback((id: number) => dispatch({ type: 'CLEAR_PARTICLE', id }), []);
@@ -941,7 +979,7 @@ export function useGameEngine() {
       return;
     }
 
-    pausedRef.current = true;
+    addPauseReason('ad');
     setAdMuted(true);
     let rewarded = false;
     try {
@@ -950,21 +988,23 @@ export function useGameEngine() {
       console.error('[Game] showRewarded failed', e);
     } finally {
       setAdMuted(false);
-      pausedRef.current = false;
+      removePauseReason('ad');
     }
     if (rewarded) {
       audio.win();
       dispatch({ type: 'CLAIM_AD_REWARD' });
     }
-  }, []);
+  }, [addPauseReason, removePauseReason]);
   // Exposed so callers (e.g. the onboarding tutorial) can pause the tick
-  // loop for reasons other than ad playback. Uses the same pausedRef gate
-  // as watchAd/claimAfkBonus, so it's safe if both happen to overlap —
-  // just make sure whichever call turns it on is also responsible for
-  // turning it back off.
+  // loop for reasons other than ad playback. Uses the same reason-based
+  // pause gate as watchAd/claimAfkBonus/tab-visibility, so it's safe if
+  // more than one of them happens to overlap — each caller only ever
+  // adds/removes its own reason, and the engine stays paused until every
+  // reason has cleared.
   const setEnginePaused = useCallback((paused: boolean) => {
-    pausedRef.current = paused;
-  }, []);
+    if (paused) addPauseReason('onboarding');
+    else removePauseReason('onboarding');
+  }, [addPauseReason, removePauseReason]);
   // claimAfkBonus
   const claimAfkBonus = useCallback(async () => {
     const summary = stateRef.current.afkSummary;
@@ -976,7 +1016,7 @@ export function useGameEngine() {
       return;
     }
 
-    pausedRef.current = true;
+    addPauseReason('ad');
     setAdMuted(true);
     let rewarded = false;
     try {
@@ -985,13 +1025,13 @@ export function useGameEngine() {
       console.error('[Game] showRewarded (AFK bonus) failed', e);
     } finally {
       setAdMuted(false);
-      pausedRef.current = false;
+      removePauseReason('ad');
     }
     if (rewarded) {
       audio.win();
       dispatch({ type: 'CLAIM_AFK_BONUS' });
     }
-  }, []);
+  }, [addPauseReason, removePauseReason]);
   const cheatAddFunds = useCallback((amount = 100_000) => {
     dispatch({ type: 'CHEAT_ADD_FUNDS', amount });
   }, []);
@@ -1018,6 +1058,7 @@ export function useGameEngine() {
     hasStarted,
     start,
     cheatAddFunds,
-    setEnginePaused
+    setEnginePaused,
+    isPaused,
   };
 }

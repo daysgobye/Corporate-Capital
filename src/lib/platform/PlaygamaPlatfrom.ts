@@ -19,10 +19,14 @@ interface PlaygamaBridge {
   EVENT_NAME: {
     INTERSTITIAL_STATE_CHANGED: string
     REWARDED_STATE_CHANGED: string
+    AUDIO_STATE_CHANGED: string
+    PAUSE_STATE_CHANGED: string
   }
   platform: {
     language: string
+    isAudioEnabled: boolean
     sendMessage(msg: string): void
+    on(event: string, handler: (payload: boolean) => void): void
   }
   storage: {
     defaultType: string
@@ -69,10 +73,16 @@ const debug = {
 export class PlaygamaPlatform implements IPlatform {
   private _bridge: PlaygamaBridge | null = null
   private _language = 'en'
+  // Mirrors bridge.platform.isAudioEnabled — cached locally so the
+  // isAudioEnabled getter stays synchronous and cheap. Seeded from the
+  // bridge on init(), then kept current via the AUDIO_STATE_CHANGED
+  // subscription below.
+  private _audioEnabled = true
 
   get language() { return this._language }
   get isRewardedSupported() { return this._bridge?.advertisement.isRewardedSupported ?? false }
   get leaderboardType() { return this._bridge?.leaderboards.type ?? 'not_available' }
+  get isAudioEnabled() { return this._audioEnabled }
 
   async init(): Promise<void> {
     await this._waitForBridge()
@@ -80,7 +90,18 @@ export class PlaygamaPlatform implements IPlatform {
     await this._bridge.initialize()
     this._language = this._bridge.platform.language ?? navigator.language?.split('-')[0] ?? 'en'
     this._bridge.advertisement.setMinimumDelayBetweenInterstitial(150)
-    debug.console.log('[Platform] Playgama Bridge initialized, lang:', this._language, 'leaderboardType:', this.leaderboardType, 'rewardedSupported:', this.isRewardedSupported)
+
+    // Per Playgama's docs: the CURRENT value must be read up front — the
+    // AUDIO_STATE_CHANGED event only fires on *subsequent* changes, so
+    // relying on the subscription alone would miss whatever the host
+    // already decided before we finished booting.
+    this._audioEnabled = this._bridge.platform.isAudioEnabled ?? true
+    this._bridge.platform.on(this._bridge.EVENT_NAME.AUDIO_STATE_CHANGED, (isEnabled: boolean) => {
+      this._audioEnabled = isEnabled
+      debug.console.log('[Platform] audio_state_changed →', isEnabled)
+    })
+
+    debug.console.log('[Platform] Playgama Bridge initialized, lang:', this._language, 'leaderboardType:', this.leaderboardType, 'rewardedSupported:', this.isRewardedSupported, 'audioEnabled:', this._audioEnabled)
   }
 
   gameReady(): void {
@@ -165,6 +186,24 @@ export class PlaygamaPlatform implements IPlatform {
   async showLeaderboardPopup(leaderboardId: string): Promise<void> {
     if (!this._bridge || this._bridge.leaderboards.type !== 'native_popup') return
     try { await this._bridge.leaderboards.showNativePopup(leaderboardId) } catch (e) { console.error('[Platform] showLeaderboardPopup failed', e) }
+  }
+
+  /**
+   * NOTE: bridge doesn't expose an "off" for platform-level events, and
+   * the handler is cheap and lives for the whole page's lifetime anyway
+   * (there's only ever one PlaygamaPlatform instance) — the returned
+   * unsubscribe is a no-op rather than pretending to remove the listener.
+   */
+  onAudioStateChanged(cb: (enabled: boolean) => void): () => void {
+    if (!this._bridge) return () => { }
+    this._bridge.platform.on(this._bridge.EVENT_NAME.AUDIO_STATE_CHANGED, cb)
+    return () => { }
+  }
+
+  onPauseStateChanged(cb: (paused: boolean) => void): () => void {
+    if (!this._bridge) return () => { }
+    this._bridge.platform.on(this._bridge.EVENT_NAME.PAUSE_STATE_CHANGED, cb)
+    return () => { }
   }
 
   private _waitForBridge(timeoutMs = 5000): Promise<void> {

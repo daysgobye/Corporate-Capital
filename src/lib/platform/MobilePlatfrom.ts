@@ -6,10 +6,10 @@ export class MobilePlatform implements IPlatform {
     ?? 'en'
 
   readonly isRewardedSupported = false
-
-  // Mobile wrapper has no leaderboard backend wired up yet — fill this in
-  // when you add one (Game Center / Play Games / your own backend, etc.)
   readonly leaderboardType: 'not_available' = 'not_available'
+  // No native mute/pause bridge wired up yet — wire these to your SDK's
+  // real audio-focus / lifecycle-pause callbacks when you add one.
+  readonly isAudioEnabled = true
 
   async init(): Promise<void> {
     console.log('[Platform] MobilePlatform: init — fill in your SDK here')
@@ -55,5 +55,15 @@ export class MobilePlatform implements IPlatform {
 
   async showLeaderboardPopup(_leaderboardId: string): Promise<void> {
     console.log('[Platform] MobilePlatform: showLeaderboardPopup (stub, no-op)')
+  }
+
+  onAudioStateChanged(_cb: (enabled: boolean) => void): () => void {
+    console.log('[Platform] MobilePlatform: onAudioStateChanged (stub, never fires)')
+    return () => { }
+  }
+
+  onPauseStateChanged(_cb: (paused: boolean) => void): () => void {
+    console.log('[Platform] MobilePlatform: onPauseStateChanged (stub, never fires)')
+    return () => { }
   }
 }

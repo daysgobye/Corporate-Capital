@@ -23,7 +23,7 @@ function App() {
     claimAfkBonus, phaseTransitioning,
     saveChecked, hasSave, hasStarted, start,
     cheatAddFunds,
-    setEnginePaused
+    setEnginePaused, isPaused
   } = useGameEngine();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const onboardingSeenRef = useRef(false);
@@ -82,7 +82,7 @@ function App() {
   }
 
   return (
-    <div className={`app-shell ${cashShake ? 'cash-shake' : ''}`}>
+    <div className={`app-shell ${cashShake ? 'cash-shake' : ''} ${isPaused ? 'game-paused' : ''}`}>
       <JobHeader state={state} title={currentTitle} onClearMoneyFloater={clearMoneyFloater} />
 
       <main className={`panels-grid mobile-show-${mobileTab}`}>

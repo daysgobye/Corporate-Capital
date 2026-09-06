@@ -4,6 +4,7 @@ export class NullPlatform implements IPlatform {
   readonly language = navigator.language?.split('-')[0] ?? 'en'
   readonly isRewardedSupported = false
   readonly leaderboardType: 'not_available' = 'not_available'
+  readonly isAudioEnabled = true
 
   async init(): Promise<void> { console.log('[Platform] NullPlatform: init') }
   gameReady(): void { console.log('[Platform] NullPlatform: gameReady') }
@@ -18,4 +19,6 @@ export class NullPlatform implements IPlatform {
   async setLeaderboardScore(_id: string, _score: number): Promise<void> { }
   async getLeaderboardEntries(_id: string): Promise<LeaderboardPlatformEntry[]> { return [] }
   async showLeaderboardPopup(_id: string): Promise<void> { }
+  onAudioStateChanged(_cb: (enabled: boolean) => void): () => void { return () => { } }
+  onPauseStateChanged(_cb: (paused: boolean) => void): () => void { return () => { } }
 }

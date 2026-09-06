@@ -3,17 +3,11 @@
 
   <head>
 <script>
-  window.addEventListener('error', (e) => {
-    const el = document.createElement('div');
-    el.style.cssText = 'position:fixed;inset:0;background:#000;color:#f00;padding:20px;font:12px monospace;white-space:pre-wrap;z-index:99999;overflow:auto';
-    el.textContent = 'ERROR: ' + e.message + '\n' + (e.error?.stack ?? '');
-    document.body.appendChild(el);
-  });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 </script>
-
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
     <title>Corporate Capital</title>
 
