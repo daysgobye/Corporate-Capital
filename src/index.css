@@ -50,13 +50,27 @@
   }
 }
 
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+/*
+ * NOTE: this file is the leftover Vite starter stylesheet. The real game
+ * UI lives in App.tsx → game/game.css, which never renders the old
+ * .hero/.counter demo markup. The #root rule below used to still cap the
+ * app to a fixed 1126px width, center it, and draw a 1px border down each
+ * side — on any viewport, that reads as black/empty bars and "viewport
+ * not filled" (Playgama QA). #root now just fills the screen and lets
+ * .app-shell (game.css) own the real layout.
+ */
 #root {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
+  margin: 0;
+  text-align: center;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -64,6 +78,9 @@
 
 body {
   margin: 0;
+  /* Stops the pull-to-refresh / rubber-band bounce on mobile from
+     revealing whatever is behind the page during a swipe. */
+  overscroll-behavior: none;
 }
 
 h1,

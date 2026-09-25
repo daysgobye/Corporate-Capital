@@ -26,8 +26,36 @@
   background: var(--paper);
 }
 
+/* Full-bleed fallback behind #root/.app-shell — matches the game's own
+   background so there's never a flash of mismatched white/black before
+   React mounts, and nothing shows through on overscroll bounce. Directly
+   addresses Playgama QA's "viewport not filled / black bars on mobile":
+   html/body now always cover the full device viewport. */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+  overflow: hidden;
+}
+
 * {
   box-sizing: border-box;
+  /* Playgama QA: long-press was popping the browser's native
+     text-selection handles / context menu over buttons and keys.
+     Disabling selection and iOS's "touch callout" globally is simpler
+     and more reliable than special-casing every interactive element. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  /* Prevents the double-tap-to-zoom gesture/delay on touch devices, part
+     of what made long-presses on buttons feel like they were triggering
+     browser chrome instead of a normal tap. */
+  touch-action: manipulation;
 }
 
 body {
@@ -51,7 +79,10 @@ body {
   justify-content: space-between;
   align-items: flex-end;
   gap: 16px;
-  padding: 18px 28px;
+  padding-top: calc(18px + env(safe-area-inset-top));
+  padding-bottom: 18px;
+  padding-left: calc(28px + env(safe-area-inset-left));
+  padding-right: calc(28px + env(safe-area-inset-right));
   background: var(--ink);
   color: var(--paper);
   border-bottom: 5px solid var(--accent);
@@ -780,8 +811,8 @@ display:relative;
    sticky note someone slapped on the screen until you deal with it. */
 .ad-postit-wrap {
   position: fixed;
-  top: 92px;
-  right: 16px;
+  top: calc(92px + env(safe-area-inset-top));
+  right: calc(16px + env(safe-area-inset-right));
   z-index: 100;
   /* The wrapper itself never intercepts clicks — only the note inside it
      does (see .ad-postit-pop below) — so nothing behind it is blocked. */
@@ -979,9 +1010,18 @@ display:relative;
 }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 960px) {
+/* Triggers on either a narrow width OR a square-ish/portrait-squeezed
+   aspect ratio. The old width-only condition never caught genuinely
+   square viewports (e.g. 800x800) wide enough to clear 960px — exactly
+   what caused Playgama QA's "UI overlap on 1:1" / "UI elements clipped
+   on 1:1": the 3-column desktop grid never collapsed to the single-panel
+   tabbed layout on those aspect ratios. */
+@media (max-width: 960px), (max-aspect-ratio: 1/1) {
   .job-header {
-    padding: 12px 14px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    padding-bottom: 12px;
+    padding-left: calc(14px + env(safe-area-inset-left));
+    padding-right: calc(14px + env(safe-area-inset-right));
     gap: 10px;
   }
 
@@ -1014,8 +1054,8 @@ display:relative;
   }
 
   .ad-postit-wrap {
-    top: 62px;
-    right: 10px;
+    top: calc(62px + env(safe-area-inset-top));
+    right: calc(10px + env(safe-area-inset-right));
   }
 
   .ad-postit {
@@ -1025,7 +1065,7 @@ display:relative;
 
   .panels-grid {
     grid-template-columns: 1fr;
-    padding-bottom: 60px;
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
   }
 
   .panels-grid > * {
@@ -1047,6 +1087,7 @@ display:relative;
     background: var(--ink);
     border-top: 4px solid var(--accent);
     z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .mobile-tab {

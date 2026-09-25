@@ -698,14 +698,16 @@ export function useGameEngine() {
   const startedRef = useRef(false);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // ── Pause gate (ads, onboarding, tab visibility) ────────────────────
-  // While an ad is playing, the onboarding tutorial is active, or the
-  // browser tab is hidden, we don't want tickets arriving, automation
+  // ── Pause gate (ads, onboarding, tab visibility, platform requests) ──
+  // While an ad is playing, the onboarding tutorial is active, the
+  // browser tab is hidden, or the host platform itself requests a pause
+  // (system overlay, another ad shown by the host, etc — see Playgama's
+  // platform#pause docs), we don't want tickets arriving, automation
   // resolving, cooldowns ticking down, etc. behind the player's back.
   // `pausedRef` gates the TICK dispatch itself (see the interval effect
   // below). Multiple independent things can want the engine paused at
-  // once (e.g. an ad still playing when the tab also happens to be
-  // hidden), so instead of a single boolean written by whichever caller
+  // once (e.g. an ad still playing when the platform also requests a
+  // pause), so instead of a single boolean written by whichever caller
   // ran last, we track a *set* of reasons — the engine stays paused as
   // long as the set is non-empty, and each caller only ever adds/removes
   // its own reason. `isPaused` is the React-visible mirror of the same
@@ -716,18 +718,15 @@ export function useGameEngine() {
   const pausedRef = useRef(false);
   const pauseReasonsRef = useRef<Set<string>>(new Set());
   const [isPaused, setIsPaused] = useState(false);
-
   const syncPaused = useCallback(() => {
     const shouldPause = pauseReasonsRef.current.size > 0;
     pausedRef.current = shouldPause;
     setIsPaused(shouldPause);
   }, []);
-
   const addPauseReason = useCallback((reason: string) => {
     pauseReasonsRef.current.add(reason);
     syncPaused();
   }, [syncPaused]);
-
   const removePauseReason = useCallback((reason: string) => {
     pauseReasonsRef.current.delete(reason);
     syncPaused();
@@ -802,6 +801,18 @@ export function useGameEngine() {
       initMuted().catch(() => { });
       initVisualsMuted().catch(() => { });
       platform.gameReady();
+
+      // Respect platform-driven pause requests (system overlays, the host
+      // itself showing an ad, tab visibility signals routed through the
+      // host, etc) on top of our own ad/onboarding/tab-visibility reasons
+      // above — Playgama QA flagged this as ignored entirely. Uses the
+      // same reason-set gate, so it composes safely with everything else
+      // that can also want the engine paused.
+      platform.onPauseStateChanged((paused) => {
+        if (paused) addPauseReason('platform');
+        else removePauseReason('platform');
+      });
+
       const save = await loadSaveData();
       if (cancelled) return;
 
@@ -869,7 +880,7 @@ export function useGameEngine() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [addPauseReason, removePauseReason]);
 
   // Autosave on an interval, and make sure the last bit of progress lands
   // when the tab is hidden/closed rather than only on a fixed timer.
@@ -995,16 +1006,18 @@ export function useGameEngine() {
       dispatch({ type: 'CLAIM_AD_REWARD' });
     }
   }, [addPauseReason, removePauseReason]);
+
   // Exposed so callers (e.g. the onboarding tutorial) can pause the tick
   // loop for reasons other than ad playback. Uses the same reason-based
-  // pause gate as watchAd/claimAfkBonus/tab-visibility, so it's safe if
-  // more than one of them happens to overlap — each caller only ever
-  // adds/removes its own reason, and the engine stays paused until every
-  // reason has cleared.
+  // pause gate as watchAd/claimAfkBonus/tab-visibility/platform, so it's
+  // safe if more than one of them happens to overlap — each caller only
+  // ever adds/removes its own reason, and the engine stays paused until
+  // every reason has cleared.
   const setEnginePaused = useCallback((paused: boolean) => {
     if (paused) addPauseReason('onboarding');
     else removePauseReason('onboarding');
   }, [addPauseReason, removePauseReason]);
+
   // claimAfkBonus
   const claimAfkBonus = useCallback(async () => {
     const summary = stateRef.current.afkSummary;
