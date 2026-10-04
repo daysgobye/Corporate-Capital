@@ -1,9 +1,15 @@
 /**
  * Global setup for `bun test`, wired up via the `preload` key in bunfig.toml.
  *
- * Order matters: the asset plugin is registered first so that any module
- * import resolving through it is stubbed before test files are evaluated.
+ * Order matters twice over:
+ *  1. the asset plugin registers first, so static-asset imports are stubbed
+ *     before any test file is evaluated;
+ *  2. happy-dom registers before Testing Library is imported, because Testing
+ *     Library binds its `screen` queries to `document.body` at module-init
+ *     time. Import it first and every later `screen.*` call throws.
  */
+import { afterEach, beforeEach } from 'bun:test'
+
 import './assetPlugin'
 
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -96,3 +102,27 @@ if (!('ResizeObserver' in globalThis)) {
   }
   ;(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = StubResizeObserver
 }
+// Deferred until the DOM exists — see the import-order note at the top.
+const { cleanup } = await import('@testing-library/react')
+
+// Bun runs every test file in one process against one module registry, so the
+// module-level flag state in audio.ts and visuals.ts leaks between files and
+// makes results depend on execution order. Reset both before each test so a
+// component that hides effects when visuals are muted cannot be flipped by an
+// unrelated suite.
+const { setMuted } = await import('../src/lib/audio')
+const { setVisualsMuted } = await import('../src/lib/visuals')
+
+beforeEach(() => {
+  setMuted(false)
+  setVisualsMuted(false)
+})
+
+// Unmount rendered trees between tests. Testing Library installs this itself
+// when it detects a global afterEach, but relying on that detection lets a
+// stray container leak into the next test and break every role/name query
+// that follows — so drive it explicitly.
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})

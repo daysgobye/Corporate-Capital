@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 import type { IPlatform } from '../../src/lib/platform/IPlatform'
 import type { SaveData } from '../../src/lib/storage'
@@ -39,12 +39,18 @@ const fakePlatform: IPlatform = {
 
 mock.module('../../src/lib/platform/index', () => ({
   platform: fakePlatform,
-  get platform_unused() {
-    return undefined
-  },
 }))
 
 const { loadSaveData, saveGame } = await import('../../src/lib/storage')
+
+// Bun's mock.module is process-global and cannot be un-mocked, so this file
+// would otherwise leave the fake in place for every later test file — silently
+// swapping their storage backend for a stub. Hand the module back to the real
+// NullPlatform once these tests are done.
+afterAll(async () => {
+  const { NullPlatform } = await import('../../src/lib/platform/NullPlatfrom')
+  mock.module('../../src/lib/platform/index', () => ({ platform: new NullPlatform() }))
+})
 
 const VALID_SAVE: SaveData = {
   starterAdOffered: true,
