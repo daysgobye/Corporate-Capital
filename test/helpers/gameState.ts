@@ -1,0 +1,62 @@
+import type { GameState } from '../../src/game/types'
+
+/**
+ * A complete GameState matching what the engine's own `initialState()` builds,
+ * so tests can spread a single field over the top without having to satisfy
+ * every key. Deliberately mirrors the real defaults — if the engine's shape
+ * changes, this stops typechecking.
+ */
+export function makeGameState(overrides: Partial<GameState> = {}): GameState {
+  return {
+    autoSendPulse: 0,
+    moneyFloaters: [],
+    moneyFloaterSeq: 0,
+    moneyShakeId: 0,
+    nextId: 2,
+    phase: 1,
+    promotions: 0,
+    payoutMultiplier: 1,
+    funds: 0,
+    currencyLabel: 'Corporate Capital',
+    queue: [],
+    activeTicket: { id: 1, requiredChars: 40 },
+    manualProgress: 0,
+    typedPreview: '',
+    jobLevel: 1,
+    titleModifiers: [],
+    titleFlashMs: 0,
+    upgradeLevels: {},
+    milestonesUnlocked: {},
+    cannedCooldownMs: 0,
+    aiBotNodes: 0,
+    aiBotAccumMs: 0,
+    agentCount: 0,
+    agentAccumMs: 0,
+    agentUpkeepAccumMs: 0,
+    ticketGenAccumMs: 0,
+    ticketsClosed: 0,
+    closedThisSecond: 0,
+    ticketsPerSec: 0,
+    secondAccumMs: 0,
+    incomeRatePerMin: 0,
+    secondFundsSnapshot: 0,
+    particles: [],
+    floaters: [],
+    shake: false,
+    confettiBurst: 'none',
+    stamp: { id: 0, text: '' },
+    arrivalPulse: 0,
+    upgradeFlashId: 0,
+    upgradeFlashLabel: '',
+    maxFundsEver: 0,
+    adTimerMs: 120_000,
+    adPopup: null,
+    adsUnlocked: false,
+    starterAdOffered: false,
+    afkMinutesCap: 0,
+    afkUnlocked: false,
+    lastSavedAt: 1_700_000_000_000,
+    afkSummary: null,
+    ...overrides,
+  }
+}
