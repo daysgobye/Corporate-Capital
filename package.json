@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "check": "bun run lint && tsc -b && bun test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,6 +18,10 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.43.2",
+    "@happy-dom/global-registrator": "^20.14.5",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/bun": "^1.4.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
