@@ -82,19 +82,31 @@ export function extractSaveData(state: GameState): SaveData {
   }
 }
 
+/** A save is always a plain object. Anything else means we mis-parsed. */
+function isSaveObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /**
  * Tolerant parse — accepts:
- *  - an already-parsed object/array (some bridges do this despite the
- *    string-typed interface)
+ *  - an already-parsed object (some bridges do this despite the string-typed
+ *    interface)
  *  - a normal JSON string
  *  - a JSON string that got double-wrapped in an extra layer of quotes
  *    (e.g. from manually pasting a DevTools-displayed value back into
  *    Local Storage)
+ *
+ * Returns null for anything that isn't a save object, so a malformed value
+ * degrades to "start fresh" instead of hydrating the game from garbage.
  */
-function tryParseSaveData(raw: unknown): unknown | null {
+function tryParseSaveData(raw: unknown): Record<string, unknown> | null {
   if (raw === null || raw === undefined) return null
 
   if (typeof raw === 'object') {
+    if (!isSaveObject(raw)) {
+      // console.error('[Storage] raw value was an unexpected object shape, discarding')
+      return null
+    }
     // console.log('[Storage] raw value was already an object, skipping JSON.parse')
     return raw
   }
@@ -104,24 +116,62 @@ function tryParseSaveData(raw: unknown): unknown | null {
     return null
   }
 
-  try {
-    return JSON.parse(raw)
-  } catch (e) {
-    // console.warn('[Storage] direct JSON.parse failed, attempting recovery…', e)
-  }
-
-  if (raw.length > 1 && raw.startsWith('"') && raw.endsWith('"')) {
-    const unwrapped = raw.slice(1, -1)
-    try {
-      const recovered = JSON.parse(unwrapped)
-      // console.warn('[Storage] recovered save after stripping an extra outer quote layer')
-      return recovered
-    } catch (e) {
-      // console.error('[Storage] recovery attempt also failed', e)
+  for (const candidate of unescapeCandidates(raw)) {
+    const parsed = attemptParse(candidate)
+    if (parsed !== undefined) {
+      // console.warn('[Storage] recovered save from a non-canonical value')
+      return parsed
     }
   }
 
+  // console.error('[Storage] could not parse saved game at all, starting fresh')
   return null
+}
+
+/**
+ * The strings worth trying, in order, when the raw value didn't parse straight
+ * to an object. Two distinct ways a save ends up double-wrapped:
+ *
+ *  - programmatically JSON-encoded twice, leaving the inner quotes escaped:
+ *    `"{\"funds\":1}"`. Stripping the outer quotes still isn't valid JSON, so
+ *    parsing the raw value first to get the unescaped string is the way in.
+ *  - hand-pasted from a DevTools view, leaving the inner quotes intact:
+ *    `"{"funds":1}"`. Slicing the outer quotes is the way in.
+ */
+function unescapeCandidates(raw: string): string[] {
+  const candidates = [raw]
+
+  try {
+    const unwrapped = JSON.parse(raw)
+    if (typeof unwrapped === 'string') candidates.push(unwrapped)
+  } catch (e) {
+    // console.warn('[Storage] could not unwrap one layer of quoting', e)
+  }
+
+  if (raw.length > 1 && raw.startsWith('"') && raw.endsWith('"')) {
+    candidates.push(raw.slice(1, -1))
+  }
+
+  return candidates
+}
+
+/**
+ * Parses one candidate string, yielding undefined for anything that isn't a
+ * save object.
+ *
+ * The object check matters: a double-wrapped save parses without error but
+ * yields the *inner* JSON string rather than an object. Returning that would
+ * hand HYDRATE a string, whose spread contributes character-index keys instead
+ * of save fields — quietly resetting the player's career with no error anywhere.
+ */
+function attemptParse(candidate: string): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = JSON.parse(candidate)
+    return isSaveObject(parsed) ? parsed : undefined
+  } catch (e) {
+    // console.warn('[Storage] JSON.parse failed', e)
+    return undefined
+  }
 }
 
 /** Returns null if there's no save yet (or it couldn't be read) — caller keeps the fresh initial state in that case. */
@@ -148,10 +198,10 @@ export async function loadSaveData(): Promise<SaveData | null> {
     const isCleanString = typeof raw === 'string' && raw === JSON.stringify(parsed)
     if (!isCleanString) {
       // console.log('[Storage] re-saving in canonical format after non-standard load')
-      saveGame(parsed as SaveData)
+      saveGame(parsed as unknown as SaveData)
     }
 
-    return parsed as SaveData
+    return parsed as unknown as SaveData
   } catch (e) {
     // console.error('[Storage] loadSaveData failed, starting fresh', e)
     return null
