@@ -1749,3 +1749,7 @@ display:relative;
 .game-paused * {
   animation-play-state: paused !important;
 }
+.game-paused .onboarding-overlay,
+.game-paused .onboarding-overlay * {
+  animation-play-state: running !important;
+}
